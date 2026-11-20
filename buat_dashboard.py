@@ -1,60 +1,70 @@
 import pickle
 import pandas as pd
 import plotly.graph_objects as go
-from prophet import Prophet
+from plotly.subplots import make_subplots
 
 MODEL_PATH = "D:/FreeLLM/Open Code/Project/prophet_model.pkl"
-DATA_PATH = r"C:\Users\hhfzsn\Downloads\Panama_beban_listrik_per_jam_2015-2020_.xlsx"
+RESULTS_PATH = "D:/FreeLLM/Open Code/Project/forecast_results.pkl"
 OUT_PATH = "D:/FreeLLM/Open Code/Project/docs/index.html"
 
-with open(MODEL_PATH, "rb") as f:
-    model = pickle.load(f)
+with open(RESULTS_PATH, "rb") as f:
+    results = pickle.load(f)
+merged = results["test_df"]
+metrics = results["metrics"]
 
-future = model.make_future_dataframe(periods=60)
-forecast = model.predict(future)
-
-df = pd.read_excel(DATA_PATH, sheet_name="data")
-df["datetime"] = pd.to_datetime(df["datetime"])
-daily = (
-    df.groupby(df["datetime"].dt.date)["nat_demand"]
-    .sum()
-    .reset_index()
-    .rename(columns={"datetime": "ds", "nat_demand": "y"})
-)
-daily["ds"] = pd.to_datetime(daily["ds"])
-
-fig = go.Figure()
+fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.15)
 
 fig.add_trace(
-    go.Scatter(x=daily["ds"], y=daily["y"], mode="lines", name="Beban Listrik Aktual")
+    go.Scatter(x=merged["ds"], y=merged["y"], mode="lines", name="Beban Listrik Aktual"),
+    row=1,
+    col=1,
 )
-
 fig.add_trace(
-    go.Scatter(x=forecast["ds"], y=forecast["yhat"], mode="lines", name="Forecast")
+    go.Scatter(x=merged["ds"], y=merged["yhat"], mode="lines", name="Forecast"),
+    row=1,
+    col=1,
 )
-
 fig.add_trace(
     go.Scatter(
-        x=forecast["ds"],
-        y=forecast["yhat_upper"],
+        x=merged["ds"],
+        y=merged["yhat_upper"],
         mode="lines",
-        name="Batas Atas 95%",
+        name="CI Atas (95%)",
         line=dict(dash="dash"),
-    )
+    ),
+    row=1,
+    col=1,
+)
+fig.add_trace(
+    go.Scatter(
+        x=merged["ds"],
+        y=merged["yhat_lower"],
+        mode="lines",
+        name="CI Bawah (95%)",
+        line=dict(dash="dash"),
+    ),
+    row=1,
+    col=1,
 )
 
 fig.add_trace(
-    go.Scatter(
-        x=forecast["ds"],
-        y=forecast["yhat_lower"],
-        mode="lines",
-        name="Batas Bawah 95%",
-        line=dict(dash="dash"),
-    )
+    go.Bar(
+        x=["MAE", "RMSE", "MAPE"],
+        y=[metrics["MAE"], metrics["RMSE"], metrics["MAPE"]],
+        text=[
+            f"{metrics['MAE']:.2f}",
+            f"{metrics['RMSE']:.2f}",
+            f"{metrics['MAPE']:.2f}",
+        ],
+        textposition="outside",
+        name="Metrik Evaluasi",
+    ),
+    row=2,
+    col=1,
 )
 
 fig.update_layout(
-    title="Forecasting Beban Listrik Panama - Prophet",
+    title="Forecasting Beban Listrik Panama - Prophet (Hasil Evaluasi)",
     xaxis_title="Tanggal",
     yaxis_title="Beban Listrik (MWh)",
     hovermode="x unified",
@@ -62,5 +72,4 @@ fig.update_layout(
 
 fig.write_html(OUT_PATH, include_plotlyjs=True)
 print("DASHBOARD HTML TERSIMPAN:", OUT_PATH)
-print("PREDIKSI 60 HARI KE DEPAN:")
-print(forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]].head(10).to_string())
+print("METRIK:", metrics)
