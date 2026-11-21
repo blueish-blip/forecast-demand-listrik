@@ -1,89 +1,207 @@
-# 🇵🇦 Panama Electricity Load Forecasting with Facebook Prophet
+# Panama Electricity Load Forecasting
 
-## 📌 Deskripsi
+Dashboard SPA statis untuk evaluasi dan peramalan beban listrik harian Panama (`nat_demand`). Proyek ini membandingkan **Prophet** dengan tiga baseline time series, lalu menyajikan hasilnya dalam dashboard yang siap di-deploy ke GitHub Pages.
 
-Proyek ini merupakan implementasi **time series forecasting** untuk **beban listrik nasional (`nat_demand`)** di **Panama** menggunakan model **Facebook Prophet**, dengan data kinerja beban listrik pada periode **2015–2020**.
-
-Alur kerja dalam notebook ini:
-1. **Load data** dari file Excel (`Panama_beban_listrik_per_jam_2015-2020_.xlsx`)
-2. **Exploratory Data Analysis (EDA)** & **pengecekan data** (shape, columns, dtypes, missing value, statistik dasar)
-3. **Persiapan time series** — agregasi harian beban listrik (`nat_demand` → `ds` + `y`)
-4. **Training model** Prophet (`daily_seasonality`, `weekly_seasonality`, `yearly_seasonality`)
-5. **Forecast** ke depan (±30 hari)
-6. **Simpan model** ke file `.pkl` agar tidak perlu retraining
+- **Target:** beban listrik nasional harian (`nat_demand`), satuan **MWh**
+- **Periode data:** 2015-01-04 s/d 2020-06-26 (2.001 hari bersih)
+- **Test set:** 30 hari terakhir (2020-05-28 s/d 2020-06-26)
+- **Future forecast:** 30 hari (2020-06-27 s/d 2020-07-26)
+- **Model terbaik (RMSE test):** Seasonal Naive 7 Hari
 
 ---
 
-## 📊 Dataset
+## Fitur Dashboard
 
-| Item | Keterangan |
-|---|---|
-| File | `C:\Users\hhfzsn\Downloads\Panama_beban_listrik_per_jam_2015-2020_.xlsx` |
-| Sheet | `data`, `deskripsi` |
-| Shape | 48.048 baris × 17 kolom |
-| Rentang Waktu | 2015-01-03 01:00 → 2020-06-27 00:00 (per jam) |
-| Satu Kolom Penting | `nat_demand` — Beban listrik nasional (**MWh**) |
-
-**Kolom Lain:**
-- Variabel cuaca (suhu, kelembaban, presipitasi, kecepatan angin) di 3 lokasi: **Tocumen** (Kota Panama), **Santiago**, **David**
-- `Holiday_ID`, `holiday`, `school` — indikator hari libur & periode sekolah
+- Header dengan judul, subjudul metodologi, periode data, dan `Last Updated`.
+- Kontrol model (termasuk **Bandingkan Semua Model**), filter rentang (**Semua Data / Test Set / Future Forecast**), dan **Export CSV**.
+- KPI grid 4 kolom: **RMSE, MAE, MAPE, sMAPE**, dengan subteks **R2** dan **AIC**.
+- Grafik Plotly interaktif: data aktual, fitted values, forecast, pita **95% CI**, garis awal forecast, dan range slider.
+- Panel residual (`Actual - Forecast`) dengan garis nol untuk melihat bias/heteroskedastisitas.
+- Tabel proyeksi dengan pencarian tanggal, paginasi, dan format angka `id-ID`.
+- Tema **Swiss Minimalist Dark + Pastel**, font Inter + JetBrains Mono, angka `tabular-nums`.
+- **Fallback demo data** realistis bila JSON belum tersedia atau halaman dibuka langsung via `file://`.
 
 ---
 
-## 🔁 Alur Notebook (`prophet_forecasting.ipynb`)
+## Hasil Evaluasi
 
+Metrik dihitung pada 30 hari test (out-of-sample):
+
+| Model | RMSE | MAE | MAPE | sMAPE | R2 | AIC (approx.) |
+|---|---:|---:|---:|---:|---:|---:|
+| **Prophet** (`Model_A`) | 2.527,55 | 2.310,93 | 8,84% | 8,40% | -3,3142 | 28.685,8 |
+| **Seasonal Naive 7 Hari** (`Model_B`) | **1.148,72** | **913,16** | **3,52%** | **3,47%** | **0,1089** | 29.238,6 |
+| **Holt-Winters** (`Model_C`) | 1.250,35 | 996,40 | 3,75% | 3,84% | -0,0558 | 27.717,0 |
+| **OLS Trend + Harmonik** (`Model_D`) | 4.058,26 | 3.899,86 | 14,89% | 13,77% | -10,1220 | 29.006,6 |
+
+Catatan:
+
+- **Seasonal Naive 7 Hari** adalah model terbaik pada jendela test COVID-era ini. Baseline ini mengulang siklus 7 hari terakhir secara rekursif.
+- **Prophet** tetap menjadi model utama untuk interval prediksi 95% dan disimpan ke `prophet_model.pkl`.
+- **AIC** dihitung dari residual training dengan pendekatan Gaussian `n * ln(RSS/n) + 2k`. Nilai AIC antar-kelas model tidak sepenuhnya sebanding; gunakan sebagai konteks tambahan, bukan satu-satunya dasar pemilihan.
+- Baseline memakai interval empiris dari kuantil residual training (2,5% - 97,5%).
+
+---
+
+## Metodologi
+
+1. **Agregasi harian**
+   - Data per jam dijumlahkan menjadi total harian.
+   - Hanya hari dengan **24 jam lengkap** yang dipakai.
+   - Dua hari parsial dibuang: `2015-01-03` (23 jam) dan `2020-06-27` (1 jam).
+   - Hasil: **2.001 hari bersih**.
+
+2. **Split**
+   - 1.971 hari pertama untuk training (2015-01-04 s/d 2020-05-27).
+   - 30 hari terakhir untuk test (2020-05-28 s/d 2020-06-26).
+   - 30 hari setelah data terakhir untuk future forecast (2020-06-27 s/d 2020-07-26).
+
+3. **Model**
+   - `Model_A`: Prophet (weekly + yearly seasonality, additive, interval 95%).
+   - `Model_B`: Seasonal Naive 7 hari (siklus mingguan terakhir diulang).
+   - `Model_C`: Holt-Winters (trend aditif + seasonal aditif, periode 7).
+   - `Model_D`: OLS dengan trend linear + harmonik mingguan dan tahunan.
+
+4. **Refit & simpan**
+   - Setelah evaluasi, Prophet di-refit pada seluruh 2.001 hari bersih.
+   - Model final disimpan ke `prophet_model.pkl` sehingga dashboard tidak perlu retraining.
+   - Prediksi test, metrik, dan payload dashboard disimpan ke `forecast_results.pkl`.
+
+---
+
+## Struktur Proyek
+
+```text
+.
+|-- docs/
+|   |-- index.html                  # Dashboard SPA (HTML + Tailwind + Plotly)
+|   `-- data/
+|       `-- forecast_results.json   # Data dashboard (metadata, metrics, series)
+|-- build_data.py                   # Pipeline utama: 4 model + ekspor JSON
+|-- prophet_forecasting.ipynb       # Notebook EDA + Prophet
+|-- prophet_model.pkl               # Model Prophet final (refit seluruh data)
+|-- forecast_results.pkl            # Prediksi test, metrik, payload
+|-- buat_dashboard.py               # Legacy: generator HTML standalone lama
+`-- README.md
 ```
-EDA → Pengecekan Data → Persiapan TS → Training Prophet → Forecast → Simpan Model
-```
 
 ---
 
-## 💾 Model
+## Menjalankan Secara Lokal
 
-- Model Prophet berhasil **di-run dan disave** ke `prophet_model.pkl`
-- Model dapat **di-load kembali** tanpa perlu retrain → siap dipakai untuk dashboard
-
----
-
-## 📈 Dashboard
-
-- Dihasilkan oleh `buat_dashboard.py`
-- Menggunakan **Plotly** (standalone HTML dengan inline Plotly.js)
-- Menampilkan: **beban listrik aktual + forecast + batas CI 95%**
-- Prediksi: **60 hari ke depan** dari model tersimpan
-
----
-
-## 🚀 Deploy ke GitHub Pages
-
-1. Push folder ke GitHub (struktur minimal):
-   ```
-   docs/
-   └── index.html
-   ```
-2. **Settings → Pages** → Source: `main` branch → Folder: `/docs`
-3. Save → akses: `https://<username>.github.io/<repo>/`
-
----
-
-## ▶️ Cara Menjalankan
+Dashboard memuat data dengan `fetch('./data/forecast_results.json')`. Karena `fetch` diblokir pada protokol `file://`, jalankan server statis:
 
 ```bash
-# 1. Jalankan notebook
-jupyter notebook / buka di VS Code: prophet_forecasting.ipynb
-
-# 2. Generate dashboard (membaca model .pkl)
-python buat_dashboard.py
-
-# 3. Hasil dashboard: docs/index.html
+python -m http.server 8000 --directory docs
 ```
+
+Buka:
+
+```text
+http://localhost:8000
+```
+
+Jika JSON tidak ditemukan (misalnya 404), dashboard otomatis memakai **fallback demo data** dan menampilkan badge `Mode demo - data fallback`.
 
 ---
 
-## 🛠️ Tech Stack
+## Deploy ke GitHub Pages
 
-- Python 3.10
-- pandas, numpy, matplotlib, plotly
-- Facebook Prophet (CmdStanPy backend)
-- Jupyter Notebook / nbformat
-- Plotly → GitHub Pages (static HTML)
+1. Commit dan push folder `docs/` ke repository.
+2. Buka **Settings -> Pages**.
+3. Pilih **Source: Deploy from a branch**.
+4. Pilih branch `main` dan folder **`/docs`**.
+5. Simpan. Dashboard tersedia di:
+
+```text
+https://<username>.github.io/<nama-repo>/
+```
+
+Semua path data memakai relative path (`./data/forecast_results.json`), sehingga tetap bekerja pada sub-path repository. Library Tailwind dan Plotly dimuat dari CDN.
+
+---
+
+## Regenerasi Data & Model
+
+Jalankan:
+
+```bash
+python build_data.py
+```
+
+Script akan:
+
+- membaca dataset Excel,
+- membuang hari parsial,
+- melatih 4 model dan menghitung metrik,
+- refit Prophet pada seluruh data,
+- menulis `docs/data/forecast_results.json`, `prophet_model.pkl`, dan `forecast_results.pkl`.
+
+Jika lokasi dataset berbeda, ubah konstanta `EXCEL_PATH` di bagian atas `build_data.py`.
+
+---
+
+## Skema JSON
+
+```json
+{
+  "metadata": {
+    "title": "Dashboard Peramalan Beban Listrik Harian Panama",
+    "unit": "MWh",
+    "last_updated": "2026-11-21",
+    "forecast_start_date": "2020-06-27"
+  },
+  "metrics": {
+    "Model_A": {
+      "rmse": 2527.55,
+      "mae": 2310.93,
+      "mape": 8.84,
+      "smape": 8.40,
+      "r2": -3.3142,
+      "aic": 28685.84
+    }
+  },
+  "series": [
+    {
+      "date": "2020-06-27",
+      "split": "future",
+      "actual": null,
+      "forecasts": {
+        "Model_A": {
+          "mean": 26688.23,
+          "lower_95": 24043.97,
+          "upper_95": 29454.71
+        }
+      }
+    }
+  ]
+}
+```
+
+Nilai `split` adalah `train`, `test`, atau `future`. `actual` bernilai `null` untuk periode future.
+
+---
+
+## Sumber Data
+
+- File: `C:\Users\hhfzsn\Downloads\Panama_beban_listrik_per_jam_2015-2020_.xlsx`
+- Sheet: `data`, `deskripsi`
+- 48.048 baris per jam, 17 kolom
+- Rentang: 2015-01-03 01:00 s/d 2020-06-27 00:00
+- Kolom target: `nat_demand` (MWh)
+
+---
+
+## Tech Stack
+
+- **Python 3.10**, pandas, numpy
+- **Prophet 1.5**, statsmodels 0.15
+- **HTML5**, Tailwind CSS (CDN)
+- **Plotly.js 2.35.2** + locale `id`
+- **Inter** dan **JetBrains Mono** (Google Fonts)
+
+---
+
+## Catatan Legacy
+
+`buat_dashboard.py` adalah generator HTML standalone lama (export notebook). Pipeline yang dipakai saat ini adalah **`build_data.py`** + `docs/index.html`.
