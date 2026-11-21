@@ -282,6 +282,50 @@
   <!-- ============================= MAIN ============================= -->
   <main class="mx-auto max-w-[1440px] space-y-5 px-5 py-7 sm:px-8 lg:px-10">
 
+    <!-- Overview & Workflow Description -->
+    <section aria-label="Ringkasan alur analisis" class="rounded-md border border-hairline bg-surface p-5 sm:p-6">
+      <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div class="max-w-3xl">
+          <div class="flex items-center gap-2 text-[9.5px] font-medium uppercase tracking-[0.16em] text-m2">
+            <span>Ringkasan Penelitian &amp; Alur Kerja</span>
+          </div>
+          <h2 class="mt-1.5 text-[14px] font-medium tracking-[-0.01em] text-ink">
+            Pemodelan dan Proyeksi Kebutuhan Listrik Nasional Panama
+          </h2>
+          <p class="mt-2 text-[12px] leading-6 text-muted">
+            Dashboard ini menyajikan hasil pemodelan deret waktu (<span class="italic">time series</span>) untuk memprediksi beban listrik harian Panama (<span class="font-mono text-ink/85">nat_demand</span>, dalam satuan MWh). Proses analisis dilakukan secara bertahap mulai dari pembersihan data historis per jam, pembagian skema validasi <span class="italic">out-of-sample</span>, hingga komparasi empat pendekatan model statistik dan <span class="italic">machine learning</span> sebelum menghasilkan proyeksi 30 hari ke depan.
+          </p>
+        </div>
+      </div>
+
+      <div class="mt-5 grid grid-cols-1 gap-3 border-t border-hairline pt-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="rounded border border-hairline/70 bg-canvas/50 p-3.5">
+          <div class="font-mono text-[9.5px] uppercase tracking-[0.14em] text-m2">Tahap 01 · Prapemrosesan</div>
+          <p class="mt-1.5 text-[11px] leading-5 text-muted">
+            Agregasi catatan konsumsi listrik per jam menjadi total beban harian dan penyaringan hari parsial agar seri waktu konsisten 24 jam penuh.
+          </p>
+        </div>
+        <div class="rounded border border-hairline/70 bg-canvas/50 p-3.5">
+          <div class="font-mono text-[9.5px] uppercase tracking-[0.14em] text-m2">Tahap 02 · Pemodelan</div>
+          <p class="mt-1.5 text-[11px] leading-5 text-muted">
+            Melatih empat model pembanding: <span class="text-ink/85">Prophet</span>, <span class="text-ink/85">Seasonal Naive (7 hari)</span>, <span class="text-ink/85">Holt-Winters</span>, dan <span class="text-ink/85">OLS Trend + Harmonik</span>.
+          </p>
+        </div>
+        <div class="rounded border border-hairline/70 bg-canvas/50 p-3.5">
+          <div class="font-mono text-[9.5px] uppercase tracking-[0.14em] text-m2">Tahap 03 · Validasi</div>
+          <p class="mt-1.5 text-[11px] leading-5 text-muted">
+            Menguji akurasi prediksi pada 30 hari terakhir (<span class="italic">test set</span>) menggunakan metrik <span class="font-mono text-ink/85">RMSE</span>, <span class="font-mono text-ink/85">MAE</span>, <span class="font-mono text-ink/85">MAPE</span>, dan <span class="font-mono text-ink/85">sMAPE</span>.
+          </p>
+        </div>
+        <div class="rounded border border-hairline/70 bg-canvas/50 p-3.5">
+          <div class="font-mono text-[9.5px] uppercase tracking-[0.14em] text-m2">Tahap 04 · Proyeksi</div>
+          <p class="mt-1.5 text-[11px] leading-5 text-muted">
+            Menghasilkan peramalan beban listrik untuk 30 hari ke depan lengkap dengan interval kepercayaan (<span class="font-mono text-ink/85">95% CI</span>) dan diagnostik residual.
+          </p>
+        </div>
+      </div>
+    </section>
+
     <!-- Model context -->
     <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <div class="flex flex-wrap items-center gap-2.5">
