@@ -230,7 +230,7 @@
             Dashboard Peramalan Beban Listrik Harian
           </h1>
           <p id="subtitleText" class="mt-2.5 max-w-2xl text-[12.5px] leading-6 text-muted">
-            Evaluasi dan proyeksi 30 hari ke depan · Prophet vs Seasonal Naive vs Holt-Winters vs OLS Harmonik
+            Evaluasi dan proyeksi 30 hari ke depan · Prophet vs Seasonal Naive vs Holt-Winters vs OLS Harmonik vs GRU
           </p>
 
           <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-[10.5px] text-muted">
@@ -293,7 +293,7 @@
             Pemodelan dan Proyeksi Kebutuhan Listrik Nasional Panama
           </h2>
           <p class="mt-2 text-[12px] leading-6 text-muted">
-            Dashboard ini menyajikan hasil pemodelan deret waktu (<span class="italic">time series</span>) untuk memprediksi beban listrik harian Panama (<span class="font-mono text-ink/85">nat_demand</span>, dalam satuan MWh). Proses analisis dilakukan secara bertahap mulai dari pembersihan data historis per jam, pembagian skema validasi <span class="italic">out-of-sample</span>, hingga komparasi empat pendekatan model statistik dan <span class="italic">machine learning</span> sebelum menghasilkan proyeksi 30 hari ke depan.
+            Dashboard ini menyajikan hasil pemodelan deret waktu (<span class="italic">time series</span>) untuk memprediksi beban listrik harian Panama (<span class="font-mono text-ink/85">nat_demand</span>, dalam satuan MWh). Proses analisis dilakukan secara bertahap mulai dari pembersihan data historis per jam, pembagian skema validasi <span class="italic">out-of-sample</span>, hingga komparasi lima pendekatan model statistik, <span class="italic">machine learning</span>, dan <span class="italic">deep learning</span> sebelum menghasilkan proyeksi 30 hari ke depan.
           </p>
         </div>
       </div>
@@ -308,7 +308,7 @@
         <div class="rounded border border-hairline/70 bg-canvas/50 p-3.5">
           <div class="font-mono text-[9.5px] uppercase tracking-[0.14em] text-m2">Tahap 02 · Pemodelan</div>
           <p class="mt-1.5 text-[11px] leading-5 text-muted">
-            Melatih empat model pembanding: <span class="text-ink/85">Prophet</span>, <span class="text-ink/85">Seasonal Naive (7 hari)</span>, <span class="text-ink/85">Holt-Winters</span>, dan <span class="text-ink/85">OLS Trend + Harmonik</span>.
+            Melatih lima model pembanding: <span class="text-ink/85">Prophet</span>, <span class="text-ink/85">Seasonal Naive (7 hari)</span>, <span class="text-ink/85">Holt-Winters</span>, <span class="text-ink/85">OLS Trend + Harmonik</span>, dan <span class="text-ink/85">GRU</span>.
           </p>
         </div>
         <div class="rounded border border-hairline/70 bg-canvas/50 p-3.5">
@@ -393,7 +393,7 @@
     <section id="compareStrip" class="hidden rounded-md border border-hairline bg-surface p-3.5" aria-label="Perbandingan RMSE">
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div class="shrink-0 text-[9.5px] font-medium uppercase tracking-[0.16em] text-muted">RMSE Test · 30 Hari</div>
-        <div id="compareCards" class="grid flex-1 grid-cols-2 gap-2 lg:grid-cols-4"></div>
+        <div id="compareCards" class="grid flex-1 grid-cols-2 gap-2 lg:grid-cols-5"></div>
       </div>
     </section>
 
@@ -549,13 +549,15 @@
     Model_A: '#A5B4FC',
     Model_B: '#86EFAC',
     Model_C: '#FDA4AF',
-    Model_D: '#D8B4FE'
+    Model_D: '#D8B4FE',
+    Model_E: '#7DD3FC'
   };
   var FILLS = {
     Model_A: 'rgba(165,180,252,0.16)',
     Model_B: 'rgba(134,239,172,0.14)',
     Model_C: 'rgba(253,164,175,0.14)',
-    Model_D: 'rgba(216,180,254,0.14)'
+    Model_D: 'rgba(216,180,254,0.14)',
+    Model_E: 'rgba(125,211,252,0.14)'
   };
   var RANGE_LABELS = { all: 'Semua Data', test: 'Test Set', future: 'Future Forecast' };
   var PLOT_CONFIG = { responsive: true, displayModeBar: false, locale: 'id', scrollZoom: false };
@@ -706,10 +708,11 @@
       Model_A: { label: 'Prophet', short: 'Prophet' },
       Model_B: { label: 'Seasonal Naive 7 Hari', short: 'Seasonal Naive' },
       Model_C: { label: 'Holt-Winters', short: 'Holt-Winters' },
-      Model_D: { label: 'OLS Trend + Harmonik', short: 'OLS Harmonik' }
+      Model_D: { label: 'OLS Trend + Harmonik', short: 'OLS Harmonik' },
+      Model_E: { label: 'GRU', short: 'GRU' }
     };
-    var biases = { Model_A: 950, Model_B: 40, Model_C: 720, Model_D: 1800 };
-    var widths = { Model_A: 2800, Model_B: 1800, Model_C: 2200, Model_D: 3600 };
+    var biases = { Model_A: 950, Model_B: 40, Model_C: 720, Model_D: 1800, Model_E: 1150 };
+    var widths = { Model_A: 2800, Model_B: 1800, Model_C: 2200, Model_D: 3600, Model_E: 2400 };
 
     var start = new Date();
     start.setHours(0, 0, 0, 0);
@@ -763,7 +766,8 @@
       for (var i = 7; i < trainN; i++) {
         if (fitted[key][i] !== null) resid.push(actual[i] - fitted[key][i]);
       }
-      var k = key === 'Model_A' ? 25 : key === 'Model_B' ? 1 : key === 'Model_C' ? 9 : 16;
+      var k = key === 'Model_A' ? 25 : key === 'Model_B' ? 1
+        : key === 'Model_C' ? 9 : key === 'Model_E' ? 5249 : 16;
       var m = calcMetrics(yTest, pTest, resid, k);
       metrics[key] = {
         label: labels[key].label,
@@ -826,7 +830,7 @@
     return {
       metadata: {
         title: 'Dashboard Peramalan Beban Listrik Harian Panama',
-        subtitle: 'Evaluasi dan proyeksi 30 hari ke depan · Prophet vs Seasonal Naive vs Holt-Winters vs OLS Harmonik',
+        subtitle: 'Evaluasi dan proyeksi 30 hari ke depan · Prophet vs Seasonal Naive vs Holt-Winters vs OLS Harmonik vs GRU',
         unit: 'MWh',
         last_updated: toISO(new Date()),
         forecast_start_date: futureDates[0],
@@ -874,8 +878,9 @@
     var meta = modelMeta(displayKey);
     var bestMeta = modelMeta(bestKey);
 
+    var modelCount = Object.keys(state.data.metrics).length;
     byId('kpiModelName').textContent = state.model === 'compare'
-      ? 'Perbandingan 4 model · terbaik: ' + bestMeta.label
+      ? 'Perbandingan ' + modelCount + ' model · terbaik: ' + bestMeta.label
       : meta.label;
 
     var badge = byId('bestBadge');
@@ -895,7 +900,7 @@
     var parts = [];
     if (nHist) parts.push(nf0.format(nHist) + ' titik historis');
     if (nFut) parts.push(nFut + ' hari forecast');
-    var caption = (state.model === 'compare' ? '4 model · ' : meta.label + ' · ') +
+    var caption = (state.model === 'compare' ? modelCount + ' model · ' : meta.label + ' · ') +
       (parts.length ? parts.join(' + ') + ' · ' : '') +
       'pita 95% CI' + (state.model === 'compare' ? ' model terbaik' : '');
     if (state.range === 'all') caption += ' · geser slider untuk zoom';

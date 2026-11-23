@@ -1,6 +1,6 @@
 # Panama Electricity Load Forecasting
 
-Dashboard SPA statis untuk evaluasi dan peramalan beban listrik harian Panama (`nat_demand`). Proyek ini membandingkan **Prophet** dengan tiga baseline time series, lalu menyajikan hasilnya dalam dashboard yang siap di-deploy ke GitHub Pages.
+Dashboard SPA statis untuk evaluasi dan peramalan beban listrik harian Panama (`nat_demand`). Proyek ini membandingkan **Prophet**, tiga baseline time series, dan **GRU** (deep learning), lalu menyajikan hasilnya dalam dashboard yang siap di-deploy ke GitHub Pages.
 
 - **Target:** beban listrik nasional harian (`nat_demand`), satuan **MWh**
 - **Periode data:** 2015-01-04 s/d 2020-06-26 (2.001 hari bersih)
@@ -33,13 +33,15 @@ Metrik dihitung pada 30 hari test (out-of-sample):
 | **Seasonal Naive 7 Hari** (`Model_B`) | **1.148,72** | **913,16** | **3,52%** | **3,47%** | **0,1089** | 29.238,6 |
 | **Holt-Winters** (`Model_C`) | 1.250,35 | 996,40 | 3,75% | 3,84% | -0,0558 | 27.717,0 |
 | **OLS Trend + Harmonik** (`Model_D`) | 4.058,26 | 3.899,86 | 14,89% | 13,77% | -10,1220 | 29.006,6 |
+| **GRU** (`Model_E`) | 1.305,95 | 1.142,23 | 4,39% | 4,33% | -0,1517 | 58.152,7 |
 
 Catatan:
 
 - **Seasonal Naive 7 Hari** adalah model terbaik pada jendela test COVID-era ini. Baseline ini mengulang siklus 7 hari terakhir secara rekursif.
 - **Prophet** tetap menjadi model utama untuk interval prediksi 95% dan disimpan ke `prophet_model.pkl`.
+- **GRU** adalah model tambahan yang diadaptasi dari `GRU_for_Panama_National_Demand.ipynb` (GRU 64 unit, dropout 0,2, Adam 1e-3). Model final disimpan ke `gru_model.keras` beserta scalernya di `gru_scalers.pkl`.
 - **AIC** dihitung dari residual training dengan pendekatan Gaussian `n * ln(RSS/n) + 2k`. Nilai AIC antar-kelas model tidak sepenuhnya sebanding; gunakan sebagai konteks tambahan, bukan satu-satunya dasar pemilihan.
-- Baseline memakai interval empiris dari kuantil residual training (2,5% - 97,5%).
+- Baseline dan GRU memakai interval empiris dari kuantil residual training (2,5% - 97,5%).
 
 ---
 
@@ -61,11 +63,12 @@ Catatan:
    - `Model_B`: Seasonal Naive 7 hari (siklus mingguan terakhir diulang).
    - `Model_C`: Holt-Winters (trend aditif + seasonal aditif, periode 7).
    - `Model_D`: OLS dengan trend linear + harmonik mingguan dan tahunan.
+   - `Model_E`: GRU 64 unit + dropout 0,2, lookback 24 hari, 15 fitur (`nat_demand`, 12 fitur cuaca, `holiday`, `school`). Fitur diskalakan dengan `StandardScaler`. Forecast 30 hari dilakukan rekursif; fitur eksogen future mengulang siklus 7 hari terakhir.
 
 4. **Refit & simpan**
    - Setelah evaluasi, Prophet di-refit pada seluruh 2.001 hari bersih.
-   - Model final disimpan ke `prophet_model.pkl` sehingga dashboard tidak perlu retraining.
-   - Prediksi test, metrik, dan payload dashboard disimpan ke `forecast_results.pkl`.
+   - Model Prophet final disimpan ke `prophet_model.pkl`; model GRU final disimpan ke `gru_model.keras` + `gru_scalers.pkl`.
+   - Dashboard tidak perlu retraining. Prediksi test, metrik, dan payload dashboard disimpan ke `forecast_results.pkl` dan `gru_predictions.pkl`.
 
 ---
 
@@ -78,6 +81,10 @@ Catatan:
 |   `-- data/
 |       `-- forecast_results.json   # Data dashboard (metadata, metrics, series)
 |-- build_data.py                   # Pipeline utama: 4 model + ekspor JSON
+|-- build_gru.py                    # Pipeline GRU (Model_E) + update JSON
+|-- gru_model.keras                 # Model GRU final (TensorFlow/Keras)
+|-- gru_scalers.pkl                 # Scaler & konfigurasi fitur GRU
+|-- gru_predictions.pkl             # Prediksi & metrik GRU
 |-- prophet_forecasting.ipynb       # Notebook EDA + Prophet
 |-- prophet_model.pkl               # Model Prophet final (refit seluruh data)
 |-- forecast_results.pkl            # Prediksi test, metrik, payload
