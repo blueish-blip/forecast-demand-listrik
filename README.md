@@ -1,6 +1,6 @@
 # Panama Electricity Load Forecasting
 
-Dashboard SPA statis untuk evaluasi dan peramalan beban listrik harian Panama (`nat_demand`). Proyek ini membandingkan **Prophet**, tiga baseline time series, dan **GRU** (deep learning), lalu menyajikan hasilnya dalam dashboard yang siap di-deploy ke GitHub Pages.
+Dashboard SPA statis untuk evaluasi dan peramalan beban listrik harian Panama (`nat_demand`). Proyek ini membandingkan **Prophet**, tiga baseline time series, dan tiga model deep learning (**GRU**, **LSTM**, **CNN-1D**), lalu menyajikan hasilnya dalam dashboard yang siap di-deploy ke GitHub Pages.
 
 - **Target:** beban listrik nasional harian (`nat_demand`), satuan **MWh**
 - **Periode data:** 2015-01-04 s/d 2020-06-26 (2.001 hari bersih)
@@ -34,14 +34,16 @@ Metrik dihitung pada 30 hari test (out-of-sample):
 | **Holt-Winters** (`Model_C`) | 1.250,35 | 996,40 | 3,75% | 3,84% | -0,0558 | 27.717,0 |
 | **OLS Trend + Harmonik** (`Model_D`) | 4.058,26 | 3.899,86 | 14,89% | 13,77% | -10,1220 | 29.006,6 |
 | **GRU** (`Model_E`) | 1.305,95 | 1.142,23 | 4,39% | 4,33% | -0,1517 | 58.152,7 |
+| **LSTM** (`Model_F`) | 1.417,96 | 1.122,66 | 4,26% | 4,27% | -0,3578 | 72.176,9 |
+| **CNN-1D** (`Model_G`) | 1.529,22 | 1.337,43 | 5,12% | 4,99% | -0,5792 | 82.852,3 |
 
 Catatan:
 
 - **Seasonal Naive 7 Hari** adalah model terbaik pada jendela test COVID-era ini. Baseline ini mengulang siklus 7 hari terakhir secara rekursif.
 - **Prophet** tetap menjadi model utama untuk interval prediksi 95% dan disimpan ke `prophet_model.pkl`.
-- **GRU** adalah model tambahan yang diadaptasi dari `GRU_for_Panama_National_Demand.ipynb` (GRU 64 unit, dropout 0,2, Adam 1e-3). Model final disimpan ke `gru_model.keras` beserta scalernya di `gru_scalers.pkl`.
+- **GRU, LSTM, dan CNN-1D** diadaptasi dari `GRU_for_Panama_National_Demand.ipynb` (ketiga bagian: cell 0–38, 39–69, dan 70–110). Semua memakai lookback 24, 15 fitur, Adam 1e-3, dan early stopping patience 10. Model final disimpan berturut-turut ke `gru_model.keras`, `lstm_model.keras`, dan `cnn1d_model.keras` beserta scaler masing-masing.
 - **AIC** dihitung dari residual training dengan pendekatan Gaussian `n * ln(RSS/n) + 2k`. Nilai AIC antar-kelas model tidak sepenuhnya sebanding; gunakan sebagai konteks tambahan, bukan satu-satunya dasar pemilihan.
-- Baseline dan GRU memakai interval empiris dari kuantil residual training (2,5% - 97,5%).
+- Baseline dan ketiga model deep learning memakai interval empiris dari kuantil residual training (2,5% - 97,5%).
 
 ---
 
@@ -63,12 +65,15 @@ Catatan:
    - `Model_B`: Seasonal Naive 7 hari (siklus mingguan terakhir diulang).
    - `Model_C`: Holt-Winters (trend aditif + seasonal aditif, periode 7).
    - `Model_D`: OLS dengan trend linear + harmonik mingguan dan tahunan.
-   - `Model_E`: GRU 64 unit + dropout 0,2, lookback 24 hari, 15 fitur (`nat_demand`, 12 fitur cuaca, `holiday`, `school`). Fitur diskalakan dengan `StandardScaler`. Forecast 30 hari dilakukan rekursif; fitur eksogen future mengulang siklus 7 hari terakhir.
+   - `Model_E`: GRU 64 unit + dropout 0,2.
+   - `Model_F`: LSTM(64) -> Dropout(0,2) -> Dense(32, relu) -> Dense(1), early stopping patience 10.
+   - `Model_G`: Conv1D(64, k=3) -> MaxPooling1D(2) -> Conv1D(32, k=3) -> Flatten -> Dense(64, relu) -> Dropout(0,2) -> Dense(1), dengan ReduceLROnPlateau dan `shuffle=False`.
+   - Semua model deep learning memakai lookback 24 hari dan 15 fitur (`nat_demand`, 12 fitur cuaca, `holiday`, `school`). Fitur diskalakan dengan `StandardScaler`. Forecast 30 hari dilakukan rekursif; fitur eksogen future mengulang siklus 7 hari terakhir.
 
 4. **Refit & simpan**
    - Setelah evaluasi, Prophet di-refit pada seluruh 2.001 hari bersih.
-   - Model Prophet final disimpan ke `prophet_model.pkl`; model GRU final disimpan ke `gru_model.keras` + `gru_scalers.pkl`.
-   - Dashboard tidak perlu retraining. Prediksi test, metrik, dan payload dashboard disimpan ke `forecast_results.pkl` dan `gru_predictions.pkl`.
+   - Model Prophet final disimpan ke `prophet_model.pkl`. Model deep learning final disimpan ke `gru_model.keras`, `lstm_model.keras`, dan `cnn1d_model.keras` + scaler masing-masing.
+   - Dashboard tidak perlu retraining. Prediksi test, metrik, dan payload dashboard disimpan ke `forecast_results.pkl`, `gru_predictions.pkl`, `lstm_predictions.pkl`, dan `cnn1d_predictions.pkl`.
 
 ---
 
@@ -82,9 +87,16 @@ Catatan:
 |       `-- forecast_results.json   # Data dashboard (metadata, metrics, series)
 |-- build_data.py                   # Pipeline utama: 4 model + ekspor JSON
 |-- build_gru.py                    # Pipeline GRU (Model_E) + update JSON
+|-- build_dl_models.py              # Pipeline LSTM (Model_F) + CNN-1D (Model_G)
 |-- gru_model.keras                 # Model GRU final (TensorFlow/Keras)
 |-- gru_scalers.pkl                 # Scaler & konfigurasi fitur GRU
 |-- gru_predictions.pkl             # Prediksi & metrik GRU
+|-- lstm_model.keras                # Model LSTM final
+|-- lstm_scalers.pkl                # Scaler & konfigurasi fitur LSTM
+|-- lstm_predictions.pkl            # Prediksi & metrik LSTM
+|-- cnn1d_model.keras               # Model CNN-1D final
+|-- cnn1d_scalers.pkl               # Scaler & konfigurasi fitur CNN-1D
+|-- cnn1d_predictions.pkl           # Prediksi & metrik CNN-1D
 |-- prophet_forecasting.ipynb       # Notebook EDA + Prophet
 |-- prophet_model.pkl               # Model Prophet final (refit seluruh data)
 |-- forecast_results.pkl            # Prediksi test, metrik, payload
@@ -130,21 +142,22 @@ Semua path data memakai relative path (`./data/forecast_results.json`), sehingga
 
 ## Regenerasi Data & Model
 
-Jalankan:
+Jalankan berurutan:
 
 ```bash
-python build_data.py
+python build_data.py        # Model_A - Model_D + JSON awal
+python build_gru.py         # Model_E (GRU)
+python build_dl_models.py   # Model_F (LSTM) + Model_G (CNN-1D)
 ```
 
-Script akan:
+Ketiga script akan:
 
-- membaca dataset Excel,
-- membuang hari parsial,
-- melatih 4 model dan menghitung metrik,
-- refit Prophet pada seluruh data,
-- menulis `docs/data/forecast_results.json`, `prophet_model.pkl`, dan `forecast_results.pkl`.
+- membaca dataset Excel dan membuang hari parsial,
+- melatih model dengan split train/test yang identik,
+- refit model final pada seluruh 2.001 hari bersih,
+- menulis/memperbarui `docs/data/forecast_results.json` beserta artefak model dan prediksinya.
 
-Jika lokasi dataset berbeda, ubah konstanta `EXCEL_PATH` di bagian atas `build_data.py`.
+Jika lokasi dataset berbeda, ubah konstanta `EXCEL_PATH` di bagian atas `build_data.py` dan `build_gru.py` (`build_dl_models.py` memakai ulang konstanta dari `build_gru.py`).
 
 ---
 
