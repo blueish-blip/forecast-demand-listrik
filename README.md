@@ -19,6 +19,8 @@ Dashboard SPA statis untuk evaluasi dan peramalan beban listrik Panama (`nat_dem
 - Panel residual (`Actual - Forecast`) dengan garis nol untuk melihat bias/heteroskedastisitas.
 - Tabel proyeksi dengan pencarian tanggal, paginasi, dan format angka `id-ID`.
 - Animasi **GSAP + ScrollTrigger**: fade dan slide-up halus untuk tiap section serta stagger kartu saat halaman di-scroll; otomatis dinonaktifkan bila `prefers-reduced-motion` aktif.
+- **Hover highlight** halus pada kartu alur kerja, kartu KPI, kartu metodologi, dan kartu perbandingan (tanpa bayangan).
+- Kontrol **Resolusi / Model / Rentang Waktu** berada di atas baris **Evaluasi Model** dan KPI.
 - Tema **Swiss Minimalist Dark + Pastel**, font Inter + JetBrains Mono, angka `tabular-nums`.
 - **Fallback demo data** realistis bila JSON belum tersedia atau halaman dibuka langsung via `file://`.
 

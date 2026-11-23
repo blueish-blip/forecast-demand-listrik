@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta name="description" content="Dashboard peramalan beban listrik harian Panama: evaluasi Prophet, Seasonal Naive, Holt-Winters, dan OLS harmonik." />
-<title>Dashboard Peramalan Beban Listrik Harian Panama</title>
+<meta name="description" content="Dashboard peramalan beban listrik Panama (harian & per jam): evaluasi Prophet, Seasonal Naive, Holt-Winters, OLS, GRU, LSTM, dan CNN-1D." />
+<title>Dashboard Peramalan Beban Listrik Panama</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230F1115'/%3E%3Cpath d='M6 22 L12 14 L17 18 L26 7' fill='none' stroke='%2386EFAC' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -170,7 +170,7 @@
     cursor: pointer;
     min-width: 0;
   }
-  .compare-card:hover { border-color: #3A4150; }
+  .compare-card:hover { border-color: #3A4150; background: rgba(255, 255, 255, .03); }
   .compare-card.is-best { border-color: rgba(134, 239, 172, .40); background: rgba(134, 239, 172, .06); }
   .cc-name { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 11px; color: #94A3B8; }
   .cc-dot { width: 6px; height: 6px; border-radius: 9999px; flex-shrink: 0; }
@@ -197,6 +197,21 @@
   .data-table tbody td { border-bottom: 1px solid rgba(38, 42, 52, .7); padding: 9px 12px; font-size: 11px; white-space: nowrap; }
   .data-table tbody tr:last-child td { border-bottom: 0; }
   .data-table tbody tr:hover { background: rgba(255, 255, 255, .02); }
+
+  /* Hover highlight kartu: halus, tanpa bayangan */
+  section[aria-label="Ringkasan alur analisis"] .grid > div,
+  section[aria-label="Kontrol evaluasi"],
+  section[aria-label="Metrik evaluasi"] > article,
+  section[aria-label="Catatan metodologi"] > article {
+    transition: border-color .18s ease, background-color .18s ease;
+  }
+  section[aria-label="Ringkasan alur analisis"] .grid > div:hover,
+  section[aria-label="Kontrol evaluasi"]:hover,
+  section[aria-label="Metrik evaluasi"] > article:hover,
+  section[aria-label="Catatan metodologi"] > article:hover {
+    border-color: #3A4150;
+    background-color: #1B1F27;
+  }
   .date-cell { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; color: #F1F5F9; text-align: left; }
   .num-cell { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; text-align: right; color: #F1F5F9; }
   .ci-cell { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; text-align: right; color: #94A3B8; font-size: 10px; }
@@ -227,7 +242,7 @@
             Time Series Forecasting · Panama
           </div>
           <h1 class="mt-3 max-w-[24ch] text-[clamp(1.75rem,3.6vw,2.6rem)] font-bold leading-[1.08] tracking-[-0.035em] text-ink">
-            Dashboard Peramalan Beban Listrik Harian
+            Dashboard Peramalan Beban Listrik Panama
           </h1>
           <p id="subtitleText" class="mt-2.5 max-w-2xl text-[12.5px] leading-6 text-muted">
             Evaluasi dan proyeksi 30 hari ke depan · Prophet vs Seasonal Naive vs Holt-Winters vs OLS Harmonik vs GRU vs LSTM vs CNN-1D
@@ -246,43 +261,6 @@
             <span id="dataMode" class="badge badge-live"><span class="badge-dot"></span>Memuat data</span>
             <span id="granBadge" class="badge badge-demo hidden"><span class="badge-dot"></span>Per jam</span>
           </div>
-        </div>
-
-        <!-- Control panel -->
-        <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end xl:justify-end">
-          <div>
-            <label for="modelSelect" class="mb-1.5 block text-[9.5px] font-medium uppercase tracking-[0.16em] text-muted">Model Forecasting</label>
-            <div class="select-box">
-              <select id="modelSelect" class="ui-select w-full sm:w-auto" disabled>
-                <option>Memuat…</option>
-              </select>
-            </div>
-          </div>
-          <div>
-            <label for="granSelect" class="mb-1.5 block text-[9.5px] font-medium uppercase tracking-[0.16em] text-muted">Resolusi</label>
-            <div class="select-box">
-              <select id="granSelect" class="ui-select w-full sm:w-auto" disabled>
-                <option value="daily" selected>Harian</option>
-                <option value="hourly">Per Jam</option>
-              </select>
-            </div>
-          </div>
-          <div>
-            <label for="rangeSelect" class="mb-1.5 block text-[9.5px] font-medium uppercase tracking-[0.16em] text-muted">Rentang Waktu</label>
-            <div class="select-box">
-              <select id="rangeSelect" class="ui-select w-full sm:w-auto" disabled>
-                <option value="all">Semua Data</option>
-                <option value="test">Test Set</option>
-                <option value="future">Future Forecast</option>
-              </select>
-            </div>
-          </div>
-          <button id="exportBtn" type="button" class="btn-ghost h-[36px]" disabled>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/>
-            </svg>
-            Export CSV
-          </button>
         </div>
 
       </div>
@@ -333,6 +311,46 @@
             Menghasilkan peramalan beban listrik untuk 30 hari ke depan lengkap dengan interval kepercayaan (<span class="font-mono text-ink/85">95% CI</span>) dan diagnostik residual.
           </p>
         </div>
+      </div>
+    </section>
+
+    <!-- Kontrol evaluasi -->
+    <section aria-label="Kontrol evaluasi" class="rounded-md border border-hairline bg-surface p-4 sm:p-5">
+      <div class="font-mono text-[9.5px] uppercase tracking-[0.18em] text-muted/70">Kontrol Evaluasi</div>
+      <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end xl:justify-end">
+        <div>
+          <label for="modelSelect" class="mb-1.5 block text-[9.5px] font-medium uppercase tracking-[0.16em] text-muted">Model Forecasting</label>
+          <div class="select-box">
+            <select id="modelSelect" class="ui-select w-full sm:w-auto" disabled>
+              <option>Memuat…</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label for="granSelect" class="mb-1.5 block text-[9.5px] font-medium uppercase tracking-[0.16em] text-muted">Resolusi</label>
+          <div class="select-box">
+            <select id="granSelect" class="ui-select w-full sm:w-auto" disabled>
+              <option value="daily" selected>Harian</option>
+              <option value="hourly">Per Jam</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label for="rangeSelect" class="mb-1.5 block text-[9.5px] font-medium uppercase tracking-[0.16em] text-muted">Rentang Waktu</label>
+          <div class="select-box">
+            <select id="rangeSelect" class="ui-select w-full sm:w-auto" disabled>
+              <option value="all">Semua Data</option>
+              <option value="test">Test Set</option>
+              <option value="future">Future Forecast</option>
+            </select>
+          </div>
+        </div>
+        <button id="exportBtn" type="button" class="btn-ghost h-[36px]" disabled>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/>
+          </svg>
+          Export CSV
+        </button>
       </div>
     </section>
 
@@ -867,7 +885,7 @@
 
     return {
       metadata: {
-        title: 'Dashboard Peramalan Beban Listrik Harian Panama',
+        title: 'Dashboard Peramalan Beban Listrik Panama',
         subtitle: 'Evaluasi dan proyeksi 30 hari ke depan · Prophet vs Seasonal Naive vs Holt-Winters vs OLS Harmonik vs GRU vs LSTM vs CNN-1D',
         unit: 'MWh',
         last_updated: toISO(new Date()),
