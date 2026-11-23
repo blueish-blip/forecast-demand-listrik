@@ -17,8 +17,8 @@ dengan mode harian, dihitung pada resolusi per jam:
 Lingkup data:
 - hanya hari lengkap 24 jam (2.001 hari = 48.024 jam),
 - split: 47.304 jam train / 720 jam test / 720 jam future,
-- tampilan: 30 hari historis terakhir (720 jam) + test + future = 2.160 baris
-  agar JSON tetap ringan (~1,4 MB) dan grafik tetap responsif,
+- tampilan: seluruh data historis (47.304 jam) + test + future = 49.464 baris,
+  sama seperti mode harian yang menampilkan seluruh rentang data,
 - interval 95%: Prophet memakai intervalnya sendiri; model lain memakai
   kuantil residu training (2,5% - 97,5%),
 - deep learning dijalankan ulang dengan arsitektur identik notebook
@@ -89,7 +89,7 @@ SUBTITLE = (
 HOUR_PERIOD = 168    # siklus mingguan dalam jam
 TEST_HOURS = 720     # 30 hari
 FUTURE_HOURS = 720   # 30 hari
-HIST_HOURS = 720     # 30 hari historis yang ditampilkan
+HIST_HOURS = None     # None = seluruh data historis (47.304 jam) yang ditampilkan
 VALID_HOURS = 720    # window validasi terakhir saat training
 SEED = 42
 GRANULARITY = "hourly"
@@ -219,7 +219,8 @@ def main() -> None:
           f"{hourly['ds'].iloc[-1]} ({TEST_HOURS} jam)")
     print(f"Future                : {future_ts[0]} -> {future_ts[-1]} "
           f"({FUTURE_HOURS} jam)")
-    print(f"Jendela tampilan      : {HIST_HOURS} jam historis + test + future")
+    hist_hours = n_train if HIST_HOURS is None else min(HIST_HOURS, n_train)
+    print(f"Jendela tampilan      : {hist_hours} jam historis + test + future")
 
     train_df = hourly.iloc[:n_train][["ds", "y"]]
     test_df = hourly.iloc[n_train:][["ds", "y"]]
@@ -413,7 +414,7 @@ def main() -> None:
     print(f"Model terbaik: {best_model} ({MODEL_META[best_model]['label']})")
 
     series = []
-    hist_start = n_train - HIST_HOURS
+    hist_start = n_train - hist_hours
     for i in range(hist_start, n_train):
         series.append({
             "date": hourly["ds"].iloc[i].strftime("%Y-%m-%d %H:%M"),
@@ -456,8 +457,8 @@ def main() -> None:
             "test_hours": int(TEST_HOURS),
             "future_days": int(FUTURE_HOURS // 24),
             "future_hours": int(FUTURE_HOURS),
-            "history_days": int(HIST_HOURS // 24),
-            "history_hours": int(HIST_HOURS),
+            "history_days": int(hist_hours // 24),
+            "history_hours": int(hist_hours),
             "total_days": int(n // 24),
             "best_model": best_model,
             "models": MODEL_META,

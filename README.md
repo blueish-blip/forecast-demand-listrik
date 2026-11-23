@@ -99,10 +99,11 @@ Catatan mode per jam:
    - Pipeline terpisah `build_hourly.py` menghitung ulang ketujuh model pada resolusi 1 jam.
    - Hanya hari lengkap 24 jam yang dipakai → **48.024 jam** (2.001 hari).
    - Split: 47.304 jam train / 720 jam test (30 hari) / 720 jam future (30 hari).
-   - Tampilan dashboard dibatasi 30 hari historis (720 jam) + test + future = **2.160 titik** agar JSON dan grafik tetap ringan.
+   - Tampilan mencakup **seluruh data historis** (47.304 jam) + test + future = **49.464 titik**, sama seperti mode harian yang menampilkan seluruh rentang.
    - Seasonal Naive memakai periode 168 jam, Holt-Winters `seasonal_periods=168`, Prophet memakai `daily_seasonality`, dan OLS menambah harmonik harian (periode 24 jam).
    - Deep learning memakai lookback 24 jam dengan arsitektur identik mode harian; fitur eksogen future mengulang siklus 168 jam terakhir.
    - Keluaran: `docs/data/hourly_results.json` + artefak `*_hourly.keras`, `hourly_scalers.pkl`, `hourly_predictions.pkl`.
+   - Untuk mengubah **tampilan saja** (mis. jendela historis) tanpa training ulang, pakai `rebuild_hourly_json.py` — model & prediksi diambil dari artefak, lalu metrik dan prediksi diverifikasi identik dengan JSON sebelum file ditimpa.
 
 ---
 
@@ -119,6 +120,7 @@ Catatan mode per jam:
 |-- build_gru.py                    # Pipeline GRU (Model_E) + update JSON
 |-- build_dl_models.py              # Pipeline LSTM (Model_F) + CNN-1D (Model_G)
 |-- build_hourly.py                 # Pipeline mode per jam: 7 model + JSON
+|-- rebuild_hourly_json.py          # Tulis ulang JSON per jam tanpa training ulang
 |-- gru_model.keras                 # Model GRU final (TensorFlow/Keras)
 |-- gru_scalers.pkl                 # Scaler & konfigurasi fitur GRU
 |-- gru_predictions.pkl             # Prediksi & metrik GRU
@@ -184,6 +186,7 @@ python build_data.py        # Model_A - Model_D + JSON awal
 python build_gru.py         # Model_E (GRU)
 python build_dl_models.py   # Model_F (LSTM) + Model_G (CNN-1D)
 python build_hourly.py      # Mode per jam: ketujuh model + hourly_results.json
+python rebuild_hourly_json.py  # Ubah jendela tampilan per jam tanpa training ulang
 ```
 
 Keempat script akan:
@@ -241,7 +244,7 @@ Untuk mode per jam, skema identik dengan pengecualian:
 - `metadata.granularity: "hourly"` (harian: `"daily"` atau tanpa field),
 - `metadata` juga memuat `test_hours`, `future_hours`, `history_hours`,
 - field `date` memakai format `YYYY-MM-DD HH:MM` (mis. `2020-05-28 00:00`),
-- file: `docs/data/hourly_results.json`.
+- file: `docs/data/hourly_results.json` (49.464 baris, ±36 MB — GitHub Pages menyajikannya terkompresi).
 
 ---
 
