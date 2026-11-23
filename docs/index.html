@@ -244,6 +244,7 @@
               <span id="updatedText" class="font-mono tnum text-ink/90">—</span>
             </span>
             <span id="dataMode" class="badge badge-live"><span class="badge-dot"></span>Memuat data</span>
+            <span id="granBadge" class="badge badge-demo hidden"><span class="badge-dot"></span>Per jam</span>
           </div>
         </div>
 
@@ -254,6 +255,15 @@
             <div class="select-box">
               <select id="modelSelect" class="ui-select w-full sm:w-auto" disabled>
                 <option>Memuat…</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label for="granSelect" class="mb-1.5 block text-[9.5px] font-medium uppercase tracking-[0.16em] text-muted">Resolusi</label>
+            <div class="select-box">
+              <select id="granSelect" class="ui-select w-full sm:w-auto" disabled>
+                <option value="daily" selected>Harian</option>
+                <option value="hourly">Per Jam</option>
               </select>
             </div>
           </div>
@@ -466,7 +476,7 @@
           <table class="data-table">
             <thead>
               <tr>
-                <th scope="col">Tanggal</th>
+                <th scope="col" id="colDateHeader">Tanggal</th>
                 <th scope="col">Aktual</th>
                 <th scope="col">Prediksi</th>
                 <th scope="col">95% CI</th>
@@ -581,6 +591,7 @@
     isFallback: false,
     model: 'Model_B',
     range: 'all',
+    granularity: 'daily',
     tablePage: 1,
     tableSize: 10,
     query: ''
@@ -599,10 +610,21 @@
 
   function formatDate(iso, long) {
     if (!iso) return '—';
-    var p = String(iso).split('-').map(Number);
+    var s = String(iso);
+    var space = s.indexOf(' ');
+    var time = space === -1 ? '' : s.slice(space + 1);
+    if (space !== -1) s = s.slice(0, space);
+    var p = s.split('-').map(Number);
     if (p.length < 3 || !p[0]) return String(iso);
-    return p[2] + ' ' + (long ? MONTHS_ID : MONTHS_SHORT)[p[1] - 1] + ' ' + p[0];
+    var base = p[2] + ' ' + (long ? MONTHS_ID : MONTHS_SHORT)[p[1] - 1] + ' ' + p[0];
+    return time ? base + ' · ' + time.slice(0, 5) : base;
   }
+
+  function isHourly() {
+    return !!(state.data && state.data.metadata && state.data.metadata.granularity === 'hourly');
+  }
+
+  var HOVER_DATE = function () { return isHourly() ? '%d %b %Y · %H:%M' : '%d %b %Y'; };
 
   function round4(v) { return Math.round(v * 10000) / 10000; }
 
@@ -868,10 +890,16 @@
 
   function renderContext() {
     var md = state.data.metadata;
+    var hourly = isHourly();
     byId('subtitleText').textContent = md.subtitle || 'Evaluasi dan proyeksi 30 hari ke depan menggunakan beberapa model time series.';
-    byId('periodText').textContent = formatDate(md.data_start_date) + ' – ' + formatDate(md.data_end_date);
+    byId('periodText').textContent = (hourly ? 'Data ' : '') + formatDate(md.data_start_date) + ' – ' + formatDate(md.data_end_date);
     byId('updatedText').textContent = formatDate(md.last_updated);
-    byId('testWindowText').textContent = 'Test ' + (md.test_days || 30) + ' hari · ' + formatDate(md.test_start_date) + ' – ' + formatDate(md.test_end_date);
+    byId('testWindowText').textContent = hourly
+      ? 'Test ' + (md.test_hours || 720) + ' jam · ' + formatDate(md.test_start_date) + ' – ' + formatDate(md.test_end_date)
+      : 'Test ' + (md.test_days || 30) + ' hari · ' + formatDate(md.test_start_date) + ' – ' + formatDate(md.test_end_date);
+    var granBadge = byId('granBadge');
+    granBadge.classList.toggle('hidden', !hourly);
+    byId('colDateHeader').textContent = hourly ? 'Waktu' : 'Tanggal';
     byId('noteDays').textContent = nf0.format(md.total_days || 0);
 
     var mode = byId('dataMode');
@@ -907,7 +935,7 @@
 
     var parts = [];
     if (nHist) parts.push(nf0.format(nHist) + ' titik historis');
-    if (nFut) parts.push(nFut + ' hari forecast');
+    if (nFut) parts.push(nFut + (isHourly() ? ' jam forecast' : ' hari forecast'));
     var caption = (state.model === 'compare' ? modelCount + ' model · ' : meta.label + ' · ') +
       (parts.length ? parts.join(' + ') + ' · ' : '') +
       'pita 95% CI' + (state.model === 'compare' ? ' model terbaik' : '');
@@ -957,7 +985,9 @@
 
     byId('kpi-mape').textContent = nf2.format(m.mape) + '%';
     byId('kpi-mape-unit').textContent = '';
-    byId('kpi-mape-sub').textContent = (md.test_days || 30) + ' hari test';
+    byId('kpi-mape-sub').textContent = isHourly()
+      ? (md.test_hours || 720) + ' jam test'
+      : (md.test_days || 30) + ' hari test';
 
     byId('kpi-smape').textContent = nf2.format(m.smape) + '%';
     byId('kpi-smape-unit').textContent = '';
@@ -1142,7 +1172,7 @@
         x: ax,
         y: ay,
         line: { color: '#E2E8F0', width: 2 },
-        hovertemplate: '<b>%{x|%d %b %Y}</b><br>Aktual: %{y:,.0f} MWh<extra></extra>'
+        hovertemplate: '<b>%{x|' + HOVER_DATE() + '}</b><br>Aktual: %{y:,.0f} MWh<extra></extra>'
       });
     }
 
@@ -1153,7 +1183,9 @@
     var hasFuture = rows.some(function (r) { return r.split === 'future'; });
     var shapes = [];
     var annotations = [];
-    var tickformat = state.range === 'all' ? '%b %Y' : '%d %b';
+    var hourly = isHourly();
+    var tickformat = hourly ? '%d %b' : (state.range === 'all' ? '%b %Y' : '%d %b');
+    var hoverformat = hourly ? '%d %b %Y · %H:%M' : '%d %b %Y';
 
     if (hasFuture) {
       var fs = state.data.metadata.forecast_start_date;
@@ -1202,7 +1234,7 @@
         linecolor: '#262A34',
         tickfont: { family: 'JetBrains Mono, monospace', size: 10, color: '#94A3B8' },
         tickformat: tickformat,
-        hoverformat: '%d %b %Y',
+        hoverformat: hoverformat,
         rangeslider: {
           visible: true,
           thickness: 0.07,
@@ -1271,7 +1303,7 @@
     byId('residualStats').textContent = 'MAE ' + nf0.format(mae) + ' · Bias ' + (bias >= 0 ? '+' : '') + nf0.format(bias);
 
     var shapes = [];
-    if (rows.length <= 120) {
+    if (rows.length <= (isHourly() ? 96 : 120)) {
       rows.forEach(function (r, i) {
         shapes.push({
           type: 'line',
@@ -1308,7 +1340,7 @@
         opacity: rows.length <= 120 ? 0.88 : 0.62,
         line: { width: 0 }
       },
-      hovertemplate: '%{x|%d %b %Y}<br>Error: %{y:,.0f} MWh<extra></extra>'
+      hovertemplate: '%{x|' + HOVER_DATE() + '}<br>Error: %{y:,.0f} MWh<extra></extra>'
     };
 
     var layout = {
@@ -1326,8 +1358,8 @@
         zeroline: false,
         linecolor: '#262A34',
         tickfont: { family: 'JetBrains Mono, monospace', size: 10, color: '#94A3B8' },
-        tickformat: state.range === 'all' ? '%b %Y' : '%d %b',
-        hoverformat: '%d %b %Y'
+        tickformat: isHourly() ? '%d %b' : (state.range === 'all' ? '%b %Y' : '%d %b'),
+        hoverformat: isHourly() ? '%d %b %Y · %H:%M' : '%d %b %Y'
       },
       yaxis: {
         gridcolor: '#1E222B',
@@ -1435,6 +1467,8 @@
   /* ------------------------------------------------------------------ */
   /* Kontrol & event                                                    */
   /* ------------------------------------------------------------------ */
+  var suppressModelChange = false;
+
   function populateModelSelect() {
     var sel = byId('modelSelect');
     var keys = Object.keys(state.data.metrics);
@@ -1444,12 +1478,15 @@
       var meta = modelMeta(key);
       html += '<option value="' + key + '">' + meta.label + (key === bestKey ? ' · Terbaik' : '') + '</option>';
     });
+    suppressModelChange = true;
     sel.innerHTML = html;
     sel.value = state.model;
+    suppressModelChange = false;
   }
 
   function setControlsEnabled(enabled) {
     byId('modelSelect').disabled = !enabled;
+    byId('granSelect').disabled = !enabled;
     byId('rangeSelect').disabled = !enabled;
     byId('exportBtn').disabled = !enabled;
     byId('dateSearch').disabled = !enabled;
@@ -1461,7 +1498,7 @@
     var key = getDisplayKey();
     var meta = modelMeta(key);
     var rows = rowsForRange().slice().sort(function (a, b) { return a.date.localeCompare(b.date); });
-    var header = ['Tanggal', 'Split', 'Aktual', 'Prediksi', 'Lower_95', 'Upper_95', 'Error'];
+    var header = [isHourly() ? 'Waktu' : 'Tanggal', 'Split', 'Aktual', 'Prediksi', 'Lower_95', 'Upper_95', 'Error'];
     var lines = [header.join(',')];
 
     rows.forEach(function (r) {
@@ -1494,10 +1531,17 @@
 
   function bindEvents() {
     byId('modelSelect').addEventListener('change', function (e) {
-      if (!state.data) return;
+      if (!state.data || suppressModelChange) return;
       state.model = e.target.value;
       state.tablePage = 1;
       renderAll();
+    });
+
+    byId('granSelect').addEventListener('change', function (e) {
+      if (!state.data) return;
+      var gran = e.target.value === 'hourly' ? 'hourly' : 'daily';
+      if (gran === (isHourly() ? 'hourly' : 'daily')) return;
+      loadData(gran);
     });
 
     byId('rangeSelect').addEventListener('change', function (e) {
@@ -1557,26 +1601,47 @@
     return raw;
   }
 
-  async function loadData() {
+  var dataCache = { daily: null, hourly: null };
+  var fallbackCache = null;
+
+  async function fetchGranularity(gran) {
+    if (dataCache[gran]) return dataCache[gran];
+    var url = gran === 'hourly'
+      ? './data/hourly_results.json'
+      : './data/forecast_results.json';
+    var res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var raw = await res.json();
+    dataCache[gran] = normalizeData(raw);
+    return dataCache[gran];
+  }
+
+  async function loadData(gran) {
+    gran = gran === 'hourly' ? 'hourly' : 'daily';
+    var keepModel = state.model;
+    var keepRange = state.range;
+    setControlsEnabled(false);
+
     try {
-      var res = await fetch('./data/forecast_results.json', { cache: 'no-store' });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      var raw = await res.json();
-      state.data = normalizeData(raw);
+      state.data = await fetchGranularity(gran);
       state.isFallback = false;
     } catch (err) {
       console.info('[dashboard] Menggunakan data fallback:', err && err.message ? err.message : err);
-      state.data = buildFallbackData();
+      if (!fallbackCache) fallbackCache = buildFallbackData();
+      state.data = fallbackCache;
       state.isFallback = true;
+      gran = 'daily';
     }
 
-    state.model = getBestKey();
-    state.range = 'all';
+    if (keepModel !== 'compare' && !state.data.metrics[keepModel]) keepModel = getBestKey();
+    state.model = keepModel;
+    state.range = keepRange || 'all';
     state.tablePage = 1;
     state.query = '';
 
     populateModelSelect();
-    byId('rangeSelect').value = 'all';
+    byId('granSelect').value = gran;
+    byId('rangeSelect').value = state.range;
     byId('dateSearch').value = '';
     byId('pageSize').value = String(state.tableSize);
     setControlsEnabled(true);
@@ -1584,7 +1649,7 @@
   }
 
   bindEvents();
-  loadData();
+  loadData('daily');
 })();
 </script>
 </body>
