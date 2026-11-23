@@ -15,9 +15,10 @@ Dashboard SPA statis untuk evaluasi dan peramalan beban listrik Panama (`nat_dem
 - Header dengan judul, subjudul metodologi, periode data, dan `Last Updated`.
 - Kontrol **Resolusi** (**Harian / Per Jam**), model (termasuk **Bandingkan Semua Model**), filter rentang (**Semua Data / Test Set / Future Forecast**), dan **Export CSV**.
 - KPI grid 4 kolom: **RMSE, MAE, MAPE, sMAPE**, dengan subteks **R2** dan **AIC**.
-- Grafik Plotly interaktif: data aktual, fitted values, forecast, pita **95% CI**, garis awal forecast, dan range slider.
+- Grafik Plotly interaktif: data aktual, fitted values, forecast, pita **95% CI**, garis awal forecast, dan range slider. Mode Per Jam menambah pita **min–maks harian** pada Aktual.
 - Panel residual (`Actual - Forecast`) dengan garis nol untuk melihat bias/heteroskedastisitas.
 - Tabel proyeksi dengan pencarian tanggal, paginasi, dan format angka `id-ID`.
+- Animasi **GSAP + ScrollTrigger**: fade dan slide-up halus untuk tiap section serta stagger kartu saat halaman di-scroll; otomatis dinonaktifkan bila `prefers-reduced-motion` aktif.
 - Tema **Swiss Minimalist Dark + Pastel**, font Inter + JetBrains Mono, angka `tabular-nums`.
 - **Fallback demo data** realistis bila JSON belum tersedia atau halaman dibuka langsung via `file://`.
 
@@ -99,11 +100,12 @@ Catatan mode per jam:
    - Pipeline terpisah `build_hourly.py` menghitung ulang ketujuh model pada resolusi 1 jam.
    - Hanya hari lengkap 24 jam yang dipakai → **48.024 jam** (2.001 hari).
    - Split: 47.304 jam train / 720 jam test (30 hari) / 720 jam future (30 hari).
-   - Tampilan mencakup **seluruh data historis** (47.304 jam) + test + future = **49.464 titik**, sama seperti mode harian yang menampilkan seluruh rentang.
+   - **Data latih dan artefak tetap penuh per jam.** Yang masuk JSON tampilan adalah **agregat harian** (2.031 titik) hasil `aggregate_hourly_json.py`: `actual` = rata-rata 24 jam, `actual_min` / `actual_max` = minimum–maksimum harian, prediksi dan CI dirata-ratakan per hari. Metrik KPI tetap dihitung pada 720 jam test (skala per jam).
+   - Grafiknya menampilkan garis **rata-rata** dengan pita lembut **min–maks** untuk Aktual; legenda `Min–Maks` hanya muncul di mode ini. Hasil JSON ±1,6 MB (≈22× lebih ringan dari 48.744 titik; ganti resolusi < 1 detik).
    - Seasonal Naive memakai periode 168 jam, Holt-Winters `seasonal_periods=168`, Prophet memakai `daily_seasonality`, dan OLS menambah harmonik harian (periode 24 jam).
    - Deep learning memakai lookback 24 jam dengan arsitektur identik mode harian; fitur eksogen future mengulang siklus 168 jam terakhir.
    - Keluaran: `docs/data/hourly_results.json` + artefak `*_hourly.keras`, `hourly_scalers.pkl`, `hourly_predictions.pkl`.
-   - Untuk mengubah **tampilan saja** (mis. jendela historis) tanpa training ulang, pakai `rebuild_hourly_json.py` — model & prediksi diambil dari artefak, lalu metrik dan prediksi diverifikasi identik dengan JSON sebelum file ditimpa.
+   - Untuk mengubah tampilan tanpa training ulang: jalankan `rebuild_hourly_json.py` (prediksi diambil dari artefak; metrik diverifikasi identik) lalu `aggregate_hourly_json.py`.
 
 ---
 
@@ -115,12 +117,13 @@ Catatan mode per jam:
 |   |-- index.html                  # Dashboard SPA (HTML + Tailwind + Plotly)
 |   `-- data/
 |       |-- forecast_results.json   # Data mode harian (metadata, metrics, series)
-|       `-- hourly_results.json     # Data mode per jam (2.160 titik)
+|       |-- hourly_results.json     # Data mode per jam (agregat harian, 2.031 titik)
 |-- build_data.py                   # Pipeline utama: 4 model + ekspor JSON
 |-- build_gru.py                    # Pipeline GRU (Model_E) + update JSON
 |-- build_dl_models.py              # Pipeline LSTM (Model_F) + CNN-1D (Model_G)
 |-- build_hourly.py                 # Pipeline mode per jam: 7 model + JSON
 |-- rebuild_hourly_json.py          # Tulis ulang JSON per jam tanpa training ulang
+|-- aggregate_hourly_json.py        # Agregasi per jam -> harian (mean/min/max)
 |-- gru_model.keras                 # Model GRU final (TensorFlow/Keras)
 |-- gru_scalers.pkl                 # Scaler & konfigurasi fitur GRU
 |-- gru_predictions.pkl             # Prediksi & metrik GRU
@@ -185,8 +188,9 @@ Jalankan berurutan:
 python build_data.py        # Model_A - Model_D + JSON awal
 python build_gru.py         # Model_E (GRU)
 python build_dl_models.py   # Model_F (LSTM) + Model_G (CNN-1D)
-python build_hourly.py      # Mode per jam: ketujuh model + hourly_results.json
-python rebuild_hourly_json.py  # Ubah jendela tampilan per jam tanpa training ulang
+python build_hourly.py      # Mode per jam: ketujuh model + JSON penuh
+python aggregate_hourly_json.py  # Agregasi jadi 2.031 titik harian (dipakai dashboard)
+#opsional, tanpa training ulang: rebuild_hourly_json.py lalu aggregate_hourly_json.py
 ```
 
 Keempat script akan:
@@ -241,10 +245,12 @@ Nilai `split` adalah `train`, `test`, atau `future`. `actual` bernilai `null` un
 
 Untuk mode per jam, skema identik dengan pengecualian:
 
-- `metadata.granularity: "hourly"` (harian: `"daily"` atau tanpa field),
-- `metadata` juga memuat `test_hours`, `future_hours`, `history_hours`,
-- field `date` memakai format `YYYY-MM-DD HH:MM` (mis. `2020-05-28 00:00`),
-- file: `docs/data/hourly_results.json` (49.464 baris, ±36 MB — GitHub Pages menyajikannya terkompresi).
+- `metadata.granularity: "daily"`, `aggregated_from_hourly: true`, `source_granularity: "hourly"`,
+- `metadata.source_hours: 48744` dan `aggregation: "mean/min/max per day"`,
+- `metadata` juga memuat `test_days`, `future_days`, `history_days` (bukan versi jam),
+- field `date` berformat `YYYY-MM-DD` (satu baris per hari),
+- setiap baris memiliki `actual_min` dan `actual_max` (pita min–maks Aktual),
+- file: `docs/data/hourly_results.json` (±1,6 MB, 2.031 baris). Metrik tetap skala per jam.
 
 ---
 
@@ -264,6 +270,7 @@ Untuk mode per jam, skema identik dengan pengecualian:
 - **Prophet 1.5**, statsmodels 0.15
 - **HTML5**, Tailwind CSS (CDN)
 - **Plotly.js 2.35.2** + locale `id`
+- **GSAP 3.12.5** + ScrollTrigger (animasi scroll) — CDN
 - **Inter** dan **JetBrains Mono** (Google Fonts)
 
 ---

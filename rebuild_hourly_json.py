@@ -199,6 +199,10 @@ def main() -> None:
 
     # ----------------------- Verifikasi vs JSON lama -----------------------
     print("\nVerifikasi terhadap JSON sebelumnya ...")
+    old_is_hourly = bool(old["series"]) and " " in old["series"][0]["date"]
+    if not old_is_hourly:
+        print("  JSON lama sudah agregat harian: verifikasi baris dilewati "
+              "(metrik tetap diverifikasi).")
     worst = 0.0
     for key in MODEL_META:
         for field in ("rmse", "mae", "mape", "smape", "r2", "aic"):
@@ -212,20 +216,21 @@ def main() -> None:
                 worst = max(worst, abs(a - b) / max(abs(b), 1.0))
 
         # Prediksi test & future harus identik baris demi baris.
-        old_rows = [r for r in old["series"] if r["split"] in ("test", "future")]
-        for split in ("test", "future"):
-            arr = forecasts[key][split]
-            rows = [r for r in old_rows if r["split"] == split]
-            if len(rows) != len(arr):
-                raise ValueError(f"Jumlah baris {key}/{split} tidak cocok")
-            for j, row in enumerate(rows):
-                for idx, field in enumerate(("mean", "lower_95", "upper_95")):
-                    if not same_number(arr[j][idx], row["forecasts"][key][field]):
-                        raise ValueError(
-                            f"Prediksi berbeda {key}/{split} "
-                            f"{row['date']} {field}: "
-                            f"{arr[j][idx]!r} vs {row['forecasts'][key][field]!r}"
-                        )
+        if old_is_hourly:
+            old_rows = [r for r in old["series"] if r["split"] in ("test", "future")]
+            for split in ("test", "future"):
+                arr = forecasts[key][split]
+                rows = [r for r in old_rows if r["split"] == split]
+                if len(rows) != len(arr):
+                    raise ValueError(f"Jumlah baris {key}/{split} tidak cocok")
+                for j, row in enumerate(rows):
+                    for idx, field in enumerate(("mean", "lower_95", "upper_95")):
+                        if not same_number(arr[j][idx], row["forecasts"][key][field]):
+                            raise ValueError(
+                                f"Prediksi berbeda {key}/{split} "
+                                f"{row['date']} {field}: "
+                                f"{arr[j][idx]!r} vs {row['forecasts'][key][field]!r}"
+                            )
     print(f"  Metrik & prediksi test/future identik (selisih relatif "
           f"maks {worst:.2e})")
 

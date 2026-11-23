@@ -418,6 +418,7 @@
           <span class="inline-flex items-center gap-1.5"><span class="h-px w-5 bg-actual"></span>Aktual</span>
           <span class="inline-flex items-center gap-1.5"><span id="legendFitted" class="h-px w-5" style="background:#86EFAC"></span>Fitted</span>
           <span class="inline-flex items-center gap-1.5"><span id="legendForecast" class="h-px w-5 border-t border-dashed" style="border-color:#86EFAC"></span>Forecast</span>
+          <span id="legendRange" class="hidden inline-flex items-center gap-1.5"><span class="h-2 w-4 rounded-sm" style="background:rgba(226,232,240,0.16)"></span>Min–Maks</span>
         </div>
       </div>
       <div class="relative p-2 sm:p-3">
@@ -533,7 +534,7 @@
 
     <footer class="flex flex-col gap-2 border-t border-hairline pt-5 text-[10px] text-muted sm:flex-row sm:items-center sm:justify-between">
       <span>Sumber: Panama electricity load dataset (2015–2020) · <span class="font-mono">nat_demand</span></span>
-      <span class="font-mono">Prophet · Tailwind CSS · Plotly.js</span>
+      <span class="font-mono">Prophet · Tailwind CSS · Plotly.js · GSAP</span>
     </footer>
 
   </main>
@@ -547,6 +548,8 @@
 
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 <script src="https://cdn.plot.ly/plotly-locale-id-2.35.2.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
 <script>
 (function () {
   'use strict';
@@ -622,6 +625,10 @@
 
   function isHourly() {
     return !!(state.data && state.data.metadata && state.data.metadata.granularity === 'hourly');
+  }
+
+  function isAggregated() {
+    return !!(state.data && state.data.metadata && state.data.metadata.aggregated_from_hourly);
   }
 
   var HOVER_DATE = function () { return isHourly() ? '%d %b %Y · %H:%M' : '%d %b %Y'; };
@@ -897,8 +904,12 @@
     byId('testWindowText').textContent = hourly
       ? 'Test ' + (md.test_hours || 720) + ' jam · ' + formatDate(md.test_start_date) + ' – ' + formatDate(md.test_end_date)
       : 'Test ' + (md.test_days || 30) + ' hari · ' + formatDate(md.test_start_date) + ' – ' + formatDate(md.test_end_date);
+    var agg = isAggregated();
     var granBadge = byId('granBadge');
-    granBadge.classList.toggle('hidden', !hourly);
+    granBadge.classList.toggle('hidden', !hourly && !agg);
+    granBadge.innerHTML = '<span class="badge-dot"></span>' +
+      (agg ? 'Per jam · agregat harian' : 'Per jam');
+    byId('legendRange').classList.toggle('hidden', !agg);
     byId('colDateHeader').textContent = hourly ? 'Waktu' : 'Tanggal';
     byId('noteDays').textContent = nf0.format(md.total_days || 0);
 
@@ -1008,6 +1019,34 @@
     var fittedTraces = [];
     var forecastTraces = [];
     var actualTraces = [];
+
+    // 0. Pita rentang harian (min–maks aktual) untuk tampilan agregat per jam.
+    if (isAggregated()) {
+      var rangeRows = rows.filter(function (r) {
+        return isFiniteNumber(r.actual_min) && isFiniteNumber(r.actual_max);
+      });
+      if (rangeRows.length) {
+        var rx = [];
+        var ry = [];
+        rangeRows.forEach(function (r) { rx.push(r.date); ry.push(r.actual_max); });
+        for (var z = rangeRows.length - 1; z >= 0; z--) {
+          rx.push(rangeRows[z].date);
+          ry.push(rangeRows[z].actual_min);
+        }
+        bandTraces.push({
+          type: 'scatter',
+          mode: 'lines',
+          name: 'Rentang harian',
+          x: rx,
+          y: ry,
+          fill: 'toself',
+          fillcolor: 'rgba(226,232,240,0.10)',
+          line: { color: 'rgba(0,0,0,0)', width: 0 },
+          hoverinfo: 'skip',
+          showlegend: false
+        });
+      }
+    }
 
     // 1. Pita 95% CI (lapisan paling bawah).
     var bandKey = state.model === 'compare' ? bestKey : displayKey;
@@ -1165,14 +1204,21 @@
       }
     });
     if (ax.length) {
+      var acd = [];
+      rows.forEach(function (r) {
+        if (isFiniteNumber(r.actual)) acd.push([r.actual_min, r.actual_max]);
+      });
       actualTraces.push({
         type: 'scatter',
         mode: 'lines',
         name: 'Aktual',
         x: ax,
         y: ay,
+        customdata: isAggregated() ? acd : undefined,
         line: { color: '#E2E8F0', width: 2 },
-        hovertemplate: '<b>%{x|' + HOVER_DATE() + '}</b><br>Aktual: %{y:,.0f} MWh<extra></extra>'
+        hovertemplate: isAggregated()
+          ? '<b>%{x|' + HOVER_DATE() + '}</b><br>Rata-rata: %{y:,.0f} MWh<br>Min–maks: %{customdata[0]:,.0f} – %{customdata[1]:,.0f} MWh<extra></extra>'
+          : '<b>%{x|' + HOVER_DATE() + '}</b><br>Aktual: %{y:,.0f} MWh<extra></extra>'
       });
     }
 
@@ -1540,7 +1586,7 @@
     byId('granSelect').addEventListener('change', function (e) {
       if (!state.data) return;
       var gran = e.target.value === 'hourly' ? 'hourly' : 'daily';
-      if (gran === (isHourly() ? 'hourly' : 'daily')) return;
+      if (gran === state.granularity) return;
       loadData(gran);
     });
 
@@ -1636,6 +1682,7 @@
     if (keepModel !== 'compare' && !state.data.metrics[keepModel]) keepModel = getBestKey();
     state.model = keepModel;
     state.range = keepRange || 'all';
+    state.granularity = gran;
     state.tablePage = 1;
     state.query = '';
 
@@ -1646,6 +1693,42 @@
     byId('pageSize').value = String(state.tableSize);
     setControlsEnabled(true);
     renderAll();
+    initAnimations();
+    if (typeof ScrollTrigger !== 'undefined') ScrollTrigger.refresh();
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Animasi scroll (GSAP + ScrollTrigger)                              */
+  /* ------------------------------------------------------------------ */
+  var animationsReady = false;
+  function initAnimations() {
+    if (animationsReady) return;
+    animationsReady = true;
+    if (typeof gsap === 'undefined' || typeof ScrollTrigger === 'undefined') return;
+    gsap.registerPlugin(ScrollTrigger);
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    gsap.utils.toArray('main > section, footer').forEach(function (sec) {
+      var label = sec.getAttribute('aria-label');
+      if (label === 'Metrik evaluasi' || sec.id === 'compareStrip') return;
+      gsap.from(sec, {
+        opacity: 0, y: 14, duration: 0.55, ease: 'power2.out',
+        scrollTrigger: { trigger: sec, start: 'top 90%', once: true }
+      });
+    });
+
+    gsap.from('section[aria-label="Metrik evaluasi"] > article', {
+      opacity: 0, y: 10, duration: 0.45, stagger: 0.06, ease: 'power2.out',
+      scrollTrigger: {
+        trigger: 'section[aria-label="Metrik evaluasi"]',
+        start: 'top 88%', once: true
+      }
+    });
+
+    gsap.from('#compareCards > *', {
+      opacity: 0, y: 8, duration: 0.4, stagger: 0.05, ease: 'power2.out',
+      scrollTrigger: { trigger: '#compareStrip', start: 'top 92%', once: true }
+    });
   }
 
   bindEvents();
