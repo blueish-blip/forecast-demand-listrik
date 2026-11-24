@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta name="description" content="Dashboard peramalan beban listrik Panama (harian & per jam): evaluasi Prophet, Seasonal Naive, Holt-Winters, OLS, GRU, LSTM, dan CNN-1D." />
+<meta name="description" content="Dashboard peramalan beban listrik Panama (harian & per jam): evaluasi Prophet, Seasonal Naive, Holt-Winters, OLS, GRU, LSTM, CNN-1D, dan Chronos-2." />
 <title>Dashboard Peramalan Beban Listrik Panama</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230F1115'/%3E%3Cpath d='M6 22 L12 14 L17 18 L26 7' fill='none' stroke='%2386EFAC' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -245,7 +245,7 @@
             Dashboard Peramalan Beban Listrik Panama
           </h1>
           <p id="subtitleText" class="mt-2.5 max-w-2xl text-[12.5px] leading-6 text-muted">
-            Evaluasi dan proyeksi 30 hari ke depan · Prophet vs Seasonal Naive vs Holt-Winters vs OLS Harmonik vs GRU vs LSTM vs CNN-1D
+            Evaluasi dan proyeksi 30 hari ke depan · Prophet vs Seasonal Naive vs Holt-Winters vs OLS Harmonik vs GRU vs LSTM vs CNN-1D vs Chronos-2
           </p>
 
           <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-[10.5px] text-muted">
@@ -281,7 +281,7 @@
             Pemodelan dan Proyeksi Kebutuhan Listrik Nasional Panama
           </h2>
           <p class="mt-2 text-[12px] leading-6 text-muted">
-            Dashboard ini menyajikan hasil pemodelan deret waktu (<span class="italic">time series</span>) untuk memprediksi beban listrik Panama (<span class="font-mono text-ink/85">nat_demand</span>, dalam satuan MWh) dalam dua resolusi: harian dan per jam. Proses analisis dilakukan secara bertahap mulai dari pembersihan data historis per jam, pembagian skema validasi <span class="italic">out-of-sample</span>, hingga komparasi tujuh pendekatan model statistik, <span class="italic">machine learning</span>, dan <span class="italic">deep learning</span> sebelum menghasilkan proyeksi 30 hari ke depan.
+            Dashboard ini menyajikan hasil pemodelan deret waktu (<span class="italic">time series</span>) untuk memprediksi beban listrik Panama (<span class="font-mono text-ink/85">nat_demand</span>, dalam satuan MWh) dalam dua resolusi: harian dan per jam. Proses analisis dilakukan secara bertahap mulai dari pembersihan data historis per jam, pembagian skema validasi <span class="italic">out-of-sample</span>, hingga komparasi delapan pendekatan: model statistik, <span class="italic">machine learning</span>, <span class="italic">deep learning</span>, dan model fondasi <span class="italic">time series</span> <span class="text-ink/85">Chronos-2</span> (<span class="italic">zero-shot</span>) sebelum menghasilkan proyeksi 30 hari ke depan.
           </p>
         </div>
       </div>
@@ -296,7 +296,7 @@
         <div class="rounded border border-hairline/70 bg-canvas/50 p-3.5">
           <div class="font-mono text-[9.5px] uppercase tracking-[0.14em] text-m2">Tahap 02 · Pemodelan</div>
           <p class="mt-1.5 text-[11px] leading-5 text-muted">
-            Melatih tujuh model pembanding: <span class="text-ink/85">Prophet</span>, <span class="text-ink/85">Seasonal Naive (7 hari)</span>, <span class="text-ink/85">Holt-Winters</span>, <span class="text-ink/85">OLS Trend + Harmonik</span>, <span class="text-ink/85">GRU</span>, <span class="text-ink/85">LSTM</span>, dan <span class="text-ink/85">CNN-1D</span>.
+            Melatih tujuh model pembanding — <span class="text-ink/85">Prophet</span>, <span class="text-ink/85">Seasonal Naive (7 hari)</span>, <span class="text-ink/85">Holt-Winters</span>, <span class="text-ink/85">OLS Trend + Harmonik</span>, <span class="text-ink/85">GRU</span>, <span class="text-ink/85">LSTM</span>, dan <span class="text-ink/85">CNN-1D</span> — serta mengevaluasi <span class="text-ink/85">Chronos-2 + Kalender</span> secara <span class="italic">zero-shot</span> tanpa training.
           </p>
         </div>
         <div class="rounded border border-hairline/70 bg-canvas/50 p-3.5">
@@ -421,7 +421,7 @@
     <section id="compareStrip" class="hidden rounded-md border border-hairline bg-surface p-3.5" aria-label="Perbandingan RMSE">
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div class="shrink-0 text-[9.5px] font-medium uppercase tracking-[0.16em] text-muted">RMSE Test · 30 Hari</div>
-        <div id="compareCards" class="grid flex-1 grid-cols-2 gap-2 lg:grid-cols-7"></div>
+        <div id="compareCards" class="grid flex-1 grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-8"></div>
       </div>
     </section>
 
@@ -537,7 +537,7 @@
         <h3 class="mt-2 text-[12.5px] font-medium text-ink">Split out-of-sample</h3>
         <p class="mt-2 text-[11px] leading-5 text-muted">
           30 hari terakhir menjadi test set. RMSE, MAE, MAPE, dan sMAPE dihitung pada periode test;
-          R² dan AIC memakai residual training sebagai konteks tambahan.
+          R² dan AIC memakai residual training sebagai konteks tambahan (AIC tidak tersedia untuk Chronos-2).
         </p>
       </article>
       <article class="rounded-md border border-hairline bg-surface p-5">
@@ -545,7 +545,8 @@
         <h3 class="mt-2 text-[12.5px] font-medium text-ink">Model &amp; 95% CI</h3>
         <p class="mt-2 text-[11px] leading-5 text-muted">
           Prophet memakai prediction interval 95%. Baseline dan model deep learning (GRU, LSTM, CNN-1D)
-          memakai kuantil empiris residual training (2,5%–97,5%). Model Prophet final disimpan di
+          memakai kuantil empiris residual training (2,5%–97,5%), sedangkan Chronos-2 memakai kuantil
+          model (2,5%–97,5%) langsung. Model Prophet final disimpan di
           <span class="font-mono text-ink/80">prophet_model.pkl</span>.
         </p>
       </article>
@@ -585,7 +586,8 @@
     Model_D: '#D8B4FE',
     Model_E: '#7DD3FC',
     Model_F: '#FDE68A',
-    Model_G: '#5EEAD4'
+    Model_G: '#5EEAD4',
+    Model_H: '#F9A8D4'
   };
   var FILLS = {
     Model_A: 'rgba(165,180,252,0.16)',
@@ -594,7 +596,8 @@
     Model_D: 'rgba(216,180,254,0.14)',
     Model_E: 'rgba(125,211,252,0.14)',
     Model_F: 'rgba(253,230,138,0.14)',
-    Model_G: 'rgba(94,234,212,0.14)'
+    Model_G: 'rgba(94,234,212,0.14)',
+    Model_H: 'rgba(249,168,212,0.14)'
   };
   var RANGE_LABELS = { all: 'Semua Data', test: 'Test Set', future: 'Future Forecast' };
   var PLOT_CONFIG = { responsive: true, displayModeBar: false, locale: 'id', scrollZoom: false };
@@ -764,10 +767,11 @@
       Model_D: { label: 'OLS Trend + Harmonik', short: 'OLS Harmonik' },
       Model_E: { label: 'GRU', short: 'GRU' },
       Model_F: { label: 'LSTM', short: 'LSTM' },
-      Model_G: { label: 'CNN-1D', short: 'CNN-1D' }
+      Model_G: { label: 'CNN-1D', short: 'CNN-1D' },
+      Model_H: { label: 'Chronos-2 + Kalender', short: 'Chronos-2' }
     };
-    var biases = { Model_A: 950, Model_B: 40, Model_C: 720, Model_D: 1800, Model_E: 1150, Model_F: 1250, Model_G: 1450 };
-    var widths = { Model_A: 2800, Model_B: 1800, Model_C: 2200, Model_D: 3600, Model_E: 2400, Model_F: 2550, Model_G: 2750 };
+    var biases = { Model_A: 950, Model_B: 40, Model_C: 720, Model_D: 1800, Model_E: 1150, Model_F: 1250, Model_G: 1450, Model_H: 1320 };
+    var widths = { Model_A: 2800, Model_B: 1800, Model_C: 2200, Model_D: 3600, Model_E: 2400, Model_F: 2550, Model_G: 2750, Model_H: 2450 };
 
     var start = new Date();
     start.setHours(0, 0, 0, 0);
@@ -823,7 +827,7 @@
       }
       var k = key === 'Model_A' ? 25 : key === 'Model_B' ? 1
         : key === 'Model_C' ? 9 : key === 'Model_E' ? 5249
-        : key === 'Model_F' ? 22593 : key === 'Model_G' ? 29729 : 16;
+        : key === 'Model_F' ? 22593 : key === 'Model_G' ? 29729 : key === 'Model_H' ? 19837 : 16;
       var m = calcMetrics(yTest, pTest, resid, k);
       metrics[key] = {
         label: labels[key].label,
@@ -886,7 +890,7 @@
     return {
       metadata: {
         title: 'Dashboard Peramalan Beban Listrik Panama',
-        subtitle: 'Evaluasi dan proyeksi 30 hari ke depan · Prophet vs Seasonal Naive vs Holt-Winters vs OLS Harmonik vs GRU vs LSTM vs CNN-1D',
+        subtitle: 'Evaluasi dan proyeksi 30 hari ke depan · Prophet vs Seasonal Naive vs Holt-Winters vs OLS Harmonik vs GRU vs LSTM vs CNN-1D vs Chronos-2',
         unit: 'MWh',
         last_updated: toISO(new Date()),
         forecast_start_date: futureDates[0],

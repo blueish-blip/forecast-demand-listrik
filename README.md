@@ -1,12 +1,12 @@
 # Panama Electricity Load Forecasting
 
-Dashboard SPA statis untuk evaluasi dan peramalan beban listrik Panama (`nat_demand`). Proyek ini membandingkan **Prophet**, tiga baseline time series, dan tiga model deep learning (**GRU**, **LSTM**, **CNN-1D**), lalu menyajikan hasilnya dalam dashboard yang siap di-deploy ke GitHub Pages. Tersedia dua resolusi: **Harian** (default) dan **Per Jam**, dipilih lewat kontrol **Resolusi**.
+Dashboard SPA statis untuk evaluasi dan peramalan beban listrik Panama (`nat_demand`). Proyek ini membandingkan **Prophet**, tiga baseline time series, tiga model deep learning (**GRU**, **LSTM**, **CNN-1D**), dan model fondasi time series **Chronos-2** (zero-shot), lalu menyajikan hasilnya dalam dashboard yang siap di-deploy ke GitHub Pages. Tersedia dua resolusi: **Harian** (default) dan **Per Jam**, dipilih lewat kontrol **Resolusi**.
 
 - **Target:** beban listrik nasional harian (`nat_demand`), satuan **MWh**
 - **Periode data:** 2015-01-04 s/d 2020-06-26 (2.001 hari bersih)
 - **Test set:** 30 hari terakhir (2020-05-28 s/d 2020-06-26)
 - **Future forecast:** 30 hari (2020-06-27 s/d 2020-07-26)
-- **Model terbaik (RMSE test):** Seasonal Naive 7 Hari
+- **Model terbaik (RMSE test):** Chronos-2 + Kalender — harian 872,84 MWh, per jam 49,47 MWh (zero-shot)
 
 ---
 
@@ -33,20 +33,23 @@ Metrik dihitung pada 30 hari test (out-of-sample):
 | Model | RMSE | MAE | MAPE | sMAPE | R2 | AIC (approx.) |
 |---|---:|---:|---:|---:|---:|---:|
 | **Prophet** (`Model_A`) | 2.527,55 | 2.310,93 | 8,84% | 8,40% | -3,3142 | 28.685,8 |
-| **Seasonal Naive 7 Hari** (`Model_B`) | **1.148,72** | **913,16** | **3,52%** | **3,47%** | **0,1089** | 29.238,6 |
+| **Seasonal Naive 7 Hari** (`Model_B`) | 1.148,72 | 913,16 | 3,52% | 3,47% | 0,1089 | 29.238,6 |
 | **Holt-Winters** (`Model_C`) | 1.250,35 | 996,40 | 3,75% | 3,84% | -0,0558 | 27.717,0 |
 | **OLS Trend + Harmonik** (`Model_D`) | 4.058,26 | 3.899,86 | 14,89% | 13,77% | -10,1220 | 29.006,6 |
 | **GRU** (`Model_E`) | 1.305,95 | 1.142,23 | 4,39% | 4,33% | -0,1517 | 58.152,7 |
 | **LSTM** (`Model_F`) | 1.417,96 | 1.122,66 | 4,26% | 4,27% | -0,3578 | 72.176,9 |
 | **CNN-1D** (`Model_G`) | 1.529,22 | 1.337,43 | 5,12% | 4,99% | -0,5792 | 82.852,3 |
+| **Chronos-2 + Kalender** (`Model_H`) | **872,84** | **728,00** | **2,79%** | **2,78%** | **0,4855** | — |
 
 Catatan:
 
-- **Seasonal Naive 7 Hari** adalah model terbaik pada jendela test COVID-era ini. Baseline ini mengulang siklus 7 hari terakhir secara rekursif.
+- **Chronos-2 + Kalender** menjadi model terbaik pada jendela test COVID-era ini (RMSE 872,84; R² 0,4855), mengungguli Seasonal Naive. Model ini zero-shot: tidak dilatih pada data Panama, hanya diberi konteks 1.971 hari dan kovariat kalender.
+- **Seasonal Naive 7 Hari** tetap baseline terbaik kedua; baseline ini mengulang siklus 7 hari terakhir secara rekursif.
+- Metrik Chronos-2 direproduksi dari `choronos/Chronos2_Panama_Demand.ipynb` dengan varian `+ kalender`; AIC tidak tersedia karena model tidak menghasilkan residual training.
 - **Prophet** tetap menjadi model utama untuk interval prediksi 95% dan disimpan ke `prophet_model.pkl`.
 - **GRU, LSTM, dan CNN-1D** diadaptasi dari `GRU_for_Panama_National_Demand.ipynb` (ketiga bagian: cell 0–38, 39–69, dan 70–110). Semua memakai lookback 24, 15 fitur, Adam 1e-3, dan early stopping patience 10. Model final disimpan berturut-turut ke `gru_model.keras`, `lstm_model.keras`, dan `cnn1d_model.keras` beserta scaler masing-masing.
 - **AIC** dihitung dari residual training dengan pendekatan Gaussian `n * ln(RSS/n) + 2k`. Nilai AIC antar-kelas model tidak sepenuhnya sebanding; gunakan sebagai konteks tambahan, bukan satu-satunya dasar pemilihan.
-- Baseline dan ketiga model deep learning memakai interval empiris dari kuantil residual training (2,5% - 97,5%).
+- Baseline dan ketiga model deep learning memakai interval empiris dari kuantil residual training (2,5% - 97,5%); Chronos-2 memakai kuantil model 2,5% - 97,5%.
 
 ### Hasil Evaluasi Mode Per Jam
 
@@ -55,17 +58,19 @@ Metrik dihitung pada 720 jam test (30 hari, 2020-05-28 s/d 2020-06-26):
 | Model | RMSE | MAE | MAPE | R2 |
 |---|---:|---:|---:|---:|
 | **Prophet** (`Model_A`) | 109,10 | 86,81 | 8,09% | 0,1041 |
-| **Seasonal Naive 7 Hari** (`Model_B`) | **72,33** | **56,91** | **5,21%** | **0,6063** |
+| **Seasonal Naive 7 Hari** (`Model_B`) | 72,33 | 56,91 | 5,21% | 0,6063 |
 | **Holt-Winters** (`Model_C`) | 114,81 | 96,45 | 8,98% | 0,0080 |
 | **OLS Trend + Harmonik** (`Model_D`) | 194,34 | 170,50 | 15,60% | -1,8426 |
 | **GRU** (`Model_E`) | 115,81 | 86,72 | 8,14% | -0,0095 |
 | **LSTM** (`Model_F`) | 119,92 | 85,97 | 8,10% | -0,0824 |
 | **CNN-1D** (`Model_G`) | 101,41 | 76,51 | 6,91% | 0,2259 |
+| **Chronos-2 + Kalender** (`Model_H`) | **49,47** | **39,54** | **3,56%** | **0,8158** |
 
 Catatan mode per jam:
 
-- Urutan peringkat mirip mode harian: **Seasonal Naive 168 jam** tetap terbaik, diikuti Prophet dan CNN-1D.
-- Pada resolusi per jam, pola harian (24 jam) sangat dominan, sehingga CNN-1D unggul dibanding GRU/LSTM.
+- **Chronos-2 + Kalender** juga terbaik di mode per jam (RMSE 49,47; R² 0,8158), diikuti **Seasonal Naive 168 jam** (72,33) dan CNN-1D (101,41).
+- Pada resolusi per jam, pola harian (24 jam) sangat dominan, sehingga CNN-1D unggul dibanding GRU/LSTM di antara model terlatih.
+- Prediksi test per jam Chronos-2 dirata-ratakan per hari untuk JSON tampilan; metrik KPI tetap dihitung pada 720 jam test.
 - Semua model memakai jendela test yang sama (720 jam) dan horizon 720 jam.
 
 ---
@@ -91,7 +96,8 @@ Catatan mode per jam:
    - `Model_E`: GRU 64 unit + dropout 0,2.
    - `Model_F`: LSTM(64) -> Dropout(0,2) -> Dense(32, relu) -> Dense(1), early stopping patience 10.
    - `Model_G`: Conv1D(64, k=3) -> MaxPooling1D(2) -> Conv1D(32, k=3) -> Flatten -> Dense(64, relu) -> Dropout(0,2) -> Dense(1), dengan ReduceLROnPlateau dan `shuffle=False`.
-   - Semua model deep learning memakai lookback 24 hari dan 15 fitur (`nat_demand`, 12 fitur cuaca, `holiday`, `school`). Fitur diskalakan dengan `StandardScaler`. Forecast 30 hari dilakukan rekursif; fitur eksogen future mengulang siklus 7 hari terakhir.
+   - `Model_H`: **Chronos-2 + Kalender** (`amazon/chronos-2`, zero-shot). Konteks 8.192 titik terakhir; kovariat kalender (`holiday`, `school`, `Holiday_ID`) sebagai *known future covariates*. Tidak dilatih/di-refit; interval 95% diambil dari kuantil model 2,5%–97,5%. Sumber: `choronos/Chronos2_Panama_Demand.ipynb`.
+    - Semua model deep learning memakai lookback 24 hari dan 15 fitur (`nat_demand`, 12 fitur cuaca, `holiday`, `school`). Fitur diskalakan dengan `StandardScaler`. Forecast 30 hari dilakukan rekursif; fitur eksogen future mengulang siklus 7 hari terakhir.
 
 4. **Refit & simpan**
    - Setelah evaluasi, Prophet di-refit pada seluruh 2.001 hari bersih.
@@ -99,7 +105,7 @@ Catatan mode per jam:
    - Dashboard tidak perlu retraining. Prediksi test, metrik, dan payload dashboard disimpan ke `forecast_results.pkl`, `gru_predictions.pkl`, `lstm_predictions.pkl`, dan `cnn1d_predictions.pkl`.
 
 5. **Mode per jam (opsional)**
-   - Pipeline terpisah `build_hourly.py` menghitung ulang ketujuh model pada resolusi 1 jam.
+   - Pipeline terpisah `build_hourly.py` menghitung ulang tujuh model terlatih pada resolusi 1 jam; `Model_H` (Chronos-2) ditambahkan oleh `build_chronos.py`.
    - Hanya hari lengkap 24 jam yang dipakai → **48.024 jam** (2.001 hari).
    - Split: 47.304 jam train / 720 jam test (30 hari) / 720 jam future (30 hari).
    - **Data latih dan artefak tetap penuh per jam.** Yang masuk JSON tampilan adalah **agregat harian** (2.031 titik) hasil `aggregate_hourly_json.py`: `actual` = rata-rata 24 jam, `actual_min` / `actual_max` = minimum–maksimum harian, prediksi dan CI dirata-ratakan per hari. Metrik KPI tetap dihitung pada 720 jam test (skala per jam).
@@ -124,6 +130,7 @@ Catatan mode per jam:
 |-- build_gru.py                    # Pipeline GRU (Model_E) + update JSON
 |-- build_dl_models.py              # Pipeline LSTM (Model_F) + CNN-1D (Model_G)
 |-- build_hourly.py                 # Pipeline mode per jam: 7 model + JSON
+|-- build_chronos.py                # Chronos-2 zero-shot (Model_H) + injeksi ke kedua JSON
 |-- rebuild_hourly_json.py          # Tulis ulang JSON per jam tanpa training ulang
 |-- aggregate_hourly_json.py        # Agregasi per jam -> harian (mean/min/max)
 |-- gru_model.keras                 # Model GRU final (TensorFlow/Keras)
@@ -178,7 +185,7 @@ Jika JSON tidak ditemukan (misalnya 404), dashboard otomatis memakai **fallback 
 https://<username>.github.io/<nama-repo>/
 ```
 
-Semua path data memakai relative path (`./data/forecast_results.json`), sehingga tetap bekerja pada sub-path repository. Library Tailwind dan Plotly dimuat dari CDN.
+Semua path data memakai relative path (`./data/forecast_results.json`), sehingga tetap bekerja pada sub-path repository. Library Tailwind, Plotly, dan GSAP dimuat dari CDN.
 
 ---
 
@@ -192,6 +199,7 @@ python build_gru.py         # Model_E (GRU)
 python build_dl_models.py   # Model_F (LSTM) + Model_G (CNN-1D)
 python build_hourly.py      # Mode per jam: ketujuh model + JSON penuh
 python aggregate_hourly_json.py  # Agregasi jadi 2.031 titik harian (dipakai dashboard)
+python build_chronos.py     # Model_H: Chronos-2 zero-shot + injeksi ke kedua JSON
 #opsional, tanpa training ulang: rebuild_hourly_json.py lalu aggregate_hourly_json.py
 ```
 
@@ -203,6 +211,8 @@ Keempat script akan:
 - menulis/memperbarui `docs/data/forecast_results.json` beserta artefak model dan prediksinya.
 
 Jika lokasi dataset berbeda, ubah konstanta `EXCEL_PATH` di bagian atas `build_data.py` dan `build_gru.py` (`build_dl_models.py` memakai ulang konstanta dari `build_gru.py`).
+
+`build_chronos.py` memerlukan lingkungan Python terpisah dengan `torch` (CPU) dan `chronos-forecasting>=2.0`, serta folder `choronos/` berisi CSV train/test dan CSV forecast dari notebook. Prediksi test di-cache ke `chronos_test_cache.json` agar tidak perlu inference ulang.
 
 ---
 
